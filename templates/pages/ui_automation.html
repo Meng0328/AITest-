@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}UI 自动化 - AI Test Hub{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow">
+    <div class="card-body">
+        <h2 class="card-title mb-4">UI 自动化测试</h2>
+        
+        <div class="tabs tabs-boxed mb-4">
+            <a class="tab tab-active" data-tab="locator" onclick="switchAutomationTab('locator')">定位器生成</a>
+            <a class="tab" data-tab="executor" onclick="switchAutomationTab('executor')">脚本执行</a>
+            <a class="tab" data-tab="recorder" onclick="switchAutomationTab('recorder')">录制回放</a>
+            <a class="tab" data-tab="history" onclick="switchAutomationTab('history')">执行历史</a>
+        </div>
+        
+        <!-- 定位器生成面板 -->
+        <div id="automationLocator" class="automation-panel">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">页面 URL</span>
+                    </label>
+                    <input type="text" id="pageUrl" class="input input-bordered" placeholder="https://example.com"/>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">元素描述</span>
+                    </label>
+                    <input type="text" id="elementDesc" class="input input-bordered" placeholder="例如：登录按钮"/>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 mb-4">
+                <button onclick="generateLocator()" class="btn btn-secondary">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    智能生成
+                </button>
+                <button onclick="analyzePage()" class="btn btn-outline">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    页面分析
+                </button>
+            </div>
+            
+            <div id="locatorResult" class="hidden">
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body">
+                        <h3 class="font-semibold mb-2">推荐定位器</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra">
+                                <thead>
+                                    <tr>
+                                        <th>类型</th>
+                                        <th>定位器值</th>
+                                        <th>置信度</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="locatorTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 脚本执行面板 -->
+        <div id="automationExecutor" class="automation-panel hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <div class="form-control mb-4">
+                        <label class="label">
+                            <span class="label-text">测试脚本</span>
+                        </label>
+                        <textarea id="testScript" class="textarea textarea-bordered font-mono h-64" placeholder="// 输入测试步骤
+open("https://example.com")
+click("#login-btn")
+type("#username", "test")"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="executeTestScript()" class="btn btn-accent">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            </svg>
+                            执行脚本
+                        </button>
+                        <button onclick="debugScript()" class="btn btn-outline">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                            </svg>
+                            单步调试
+                        </button>
+                        <button onclick="saveScript()" class="btn btn-ghost">保存</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="card bg-base-100 shadow-sm h-full">
+                        <div class="card-body">
+                            <h3 class="font-semibold mb-2">执行结果</h3>
+                            <div id="executionOutput" class="bg-gray-900 text-green-400 p-4 rounded font-mono text-sm h-64 overflow-auto">
+                                <p class="text-gray-500">等待执行...</p>
+                            </div>
+                            <div id="executionStats" class="mt-4 hidden">
+                                <div class="grid grid-cols-3 gap-2 text-center">
+                                    <div class="stat-box p-2 bg-green-100 rounded">
+                                        <div class="text-xs text-gray-600">通过</div>
+                                        <div class="text-lg font-bold text-green-600" id="statPassed">0</div>
+                                    </div>
+                                    <div class="stat-box p-2 bg-red-100 rounded">
+                                        <div class="text-xs text-gray-600">失败</div>
+                                        <div class="text-lg font-bold text-red-600" id="statFailed">0</div>
+                                    </div>
+                                    <div class="stat-box p-2 bg-blue-100 rounded">
+                                        <div class="text-xs text-gray-600">耗时</div>
+                                        <div class="text-lg font-bold text-blue-600" id="statDuration">0s</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 录制回放面板 -->
+        <div id="automationRecorder" class="automation-panel hidden">
+            <div class="text-center py-12">
+                <svg class="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-600 mb-2">录制功能</h3>
+                <p class="text-gray-500 mb-4">通过浏览器扩展录制用户操作并自动生成测试脚本</p>
+                <button class="btn btn-primary" disabled>
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                    </svg>
+                    开始录制（开发中）
+                </button>
+            </div>
+        </div>
+        
+        <!-- 执行历史面板 -->
+        <div id="automationHistory" class="automation-panel hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold">执行历史</h3>
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="搜索..." class="input input-bordered input-sm"/>
+                            <select class="select select-bordered select-sm">
+                                <option>全部状态</option>
+                                <option value="passed">通过</option>
+                                <option value="failed">失败</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>脚本名称</th>
+                                    <th>执行时间</th>
+                                    <th>耗时</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="executionHistoryTable">
+                                <tr><td colspan="6" class="text-center text-gray-400">暂无历史记录</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/uiAutomation.js') }}"></script>
+{% endblock %}

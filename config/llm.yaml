@@ -1,0 +1,78 @@
+# AI Test Hub - 多模态 LLM 网关配置
+# 支持 DeepSeek / 豆包 / 文心一言 / ChatGPT / gitcode 模型广场
+# 按权重轮询调用，失败自动降级
+
+# 全局配置
+global:
+  default_model: auto  # auto 表示自动选择
+  max_retries: 2  # 失败重试次数
+  timeout: 60  # 请求超时（秒）
+  enable_rate_limit: true  # 启用限流
+
+# 模型配置列表
+models:
+  - id: deepseek
+    name: DeepSeek V3
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+    model_name: deepseek-chat
+    weight: 30  # 权重（百分比）
+    rpm_limit: 100  # 每分钟请求数限制
+    enabled: true
+    description: "深度求索 - 代码与逻辑推理强"
+    
+  - id: doubao
+    name: 豆包大模型
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    api_key_env: DOUBAO_API_KEY
+    model_name: ep-20241209180546-szzxp
+    weight: 25
+    rpm_limit: 80
+    enabled: true
+    description: "字节豆包 - 中文理解优秀"
+    
+  - id: ernie
+    name: 文心一言 4.0
+    base_url: https://aip.baidubce.com/rpc/2.0/ai_custom/v1
+    api_key_env: ERNIE_API_KEY
+    model_name: ernie-4.0-8k
+    weight: 20
+    rpm_limit: 60
+    enabled: true
+    description: "百度文心 - 知识图谱丰富"
+    
+  - id: chatgpt
+    name: ChatGPT-4o
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    model_name: gpt-4o
+    weight: 15
+    rpm_limit: 50
+    enabled: false
+    description: "OpenAI GPT-4o - 综合能力最强"
+    
+  - id: gitcode
+    name: GitCode 模型广场
+    base_url: https://gitcode.net/api/v1/ai
+    api_key_env: GITCODE_API_KEY
+    model_name: qwen-plus
+    weight: 10
+    rpm_limit: 40
+    enabled: true
+    description: "GitCode - 通义千问定制版"
+
+# 降级策略
+fallback:
+  # 当主模型失败时，按顺序尝试以下模型
+  order: [deepseek, doubao, ernie, gitcode]
+  # 是否记录降级日志
+  log_fallback: true
+  
+# 限流配置（令牌桶算法）
+rate_limit:
+  # 桶容量（令牌数）
+  bucket_size: 100
+  # 每秒补充令牌数
+  refill_rate: 10
+  # 是否按 IP 限流
+  per_ip: false

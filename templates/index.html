@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Test Hub - 智能测试工作台</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/daisyui/4.12.10/full.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+        }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .sidebar-item { transition: all 0.2s; }
+        .sidebar-item:hover { background: rgba(99, 102, 241, 0.1); }
+        .sidebar-item.active { background: rgba(99, 102, 241, 0.2); border-left: 3px solid var(--primary); }
+        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .status-pass { background: #dcfce7; color: #166534; }
+        .status-fail { background: #fee2e2; color: #991b1b; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .modal-content { max-height: 80vh; overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <h1 class="text-xl font-bold">AI Test Hub v3.0</h1>
+                    <span class="text-xs bg-white/20 px-2 py-1 rounded">一体化平台</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="connectionStatus" class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        <span class="text-sm">已连接</span>
+                    </div>
+                    <button onclick="toggleCollaboration()" class="btn btn-sm btn-ghost">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        协作
+                    </button>
+                    <div class="dropdown dropdown-end">
+                        <label tabindex="0" class="btn btn-ghost btn-circle avatar">
+                            <div class="w-10 rounded-full bg-white/20 flex items-center justify-center">
+                                <span class="text-sm font-semibold">U</span>
+                            </div>
+                        </label>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                            <li><a onclick="showUserProfile()">个人资料</a></li>
+                            <li><a onclick="logout()">退出</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-white shadow-md min-h-screen">
+            <div class="p-4">
+                <select id="projectSelector" class="select select-bordered w-full mb-4" onchange="loadProject(this.value)">
+                    <option value="">选择项目...</option>
+                </select>
+                <button onclick="showCreateProjectModal()" class="btn btn-primary btn-sm w-full mb-4">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新建项目
+                </button>
+            </div>
+            <nav class="space-y-1">
+                <a onclick="switchTab('dashboard')" class="sidebar-item active block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        仪表盘
+                    </div>
+                </a>
+                <a onclick="switchTab('ai-generator')" class="sidebar-item block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        AI 用例生成
+                    </div>
+                </a>
+                <a onclick="switchTab('ui-automation')" class="sidebar-item block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        UI 自动化
+                    </div>
+                </a>
+                <a onclick="switchTab('test-runs')" class="sidebar-item block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        测试执行
+                    </div>
+                </a>
+                <a onclick="switchTab('defects')" class="sidebar-item block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        缺陷管理
+                    </div>
+                </a>
+                <a onclick="switchTab('reports')" class="sidebar-item block px-4 py-3 cursor-pointer">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        报告导出
+                    </div>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 p-6">
+            <!-- 仪表盘 -->
+            <div id="dashboard-tab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="stats shadow card-hover">
+                        <div class="stat">
+                            <div class="stat-figure text-primary">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div class="stat-title">总用例数</div>
+                            <div id="statTotalCases" class="stat-value text-primary">0</div>
+                        </div>
+                    </div>
+                    <div class="stats shadow card-hover">
+                        <div class="stat">
+                            <div class="stat-figure text-secondary">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                </svg>
+                            </div>
+                            <div class="stat-title">通过率</div>
+                            <div id="statPassRate" class="stat-value text-secondary">0%</div>
+                        </div>
+                    </div>
+                    <div class="stats shadow card-hover">
+                        <div class="stat">
+                            <div class="stat-figure text-accent">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                                </svg>
+                            </div>
+                            <div class="stat-title">缺陷数</div>
+                            <div id="statDefects" class="stat-value text-accent">0</div>
+                        </div>
+                    </div>
+                    <div class="stats shadow card-hover">
+                        <div class="stat">
+                            <div class="stat-figure text-info">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div class="stat-title">最近执行</div>
+                            <div id="statLastRun" class="stat-value text-info">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card bg-white shadow">
+                        <div class="card-body">
+                            <h2 class="card-title">最近测试执行</h2>
+                            <div class="overflow-x-auto">
+                                <table class="table table-zebra">
+                                    <thead>
+                                        <tr>
+                                            <th>名称</th>
+                                            <th>类型</th>
+                                            <th>状态</th>
+                                            <th>通过率</th>
+                                            <th>时间</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentTestRuns"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card bg-white shadow">
+                        <div class="card-body">
+                            <h2 class="card-title">缺陷分布</h2>
+                            <div id="defectChart" class="h-64 flex items-center justify-center bg-gray-50 rounded">
+                                <p class="text-gray-400">图表区域</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI 用例生成 -->
+            <div id="ai-generator-tab" class="tab-content hidden">
+                <div class="card bg-white shadow">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4">AI 测试用例生成</h2>
+                        <div class="form-control mb-4">
+                            <label class="label">
+                                <span class="label-text">需求文档/用户故事</span>
+                            </label>
+                            <textarea id="requirementInput" class="textarea textarea-bordered h-40" placeholder="请输入需求描述或粘贴用户故事..."></textarea>
+                        </div>
+                        <div class="flex gap-4 mb-4">
+                            <div class="form-control flex-1">
+                                <label class="label">
+                                    <span class="label-text">AI 模型</span>
+                                </label>
+                                <select id="aiModelSelect" class="select select-bordered">
+                                    <option value="qwen-plus">Qwen Plus</option>
+                                    <option value="deepseek-v3">DeepSeek V3</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                </select>
+                            </div>
+                            <div class="form-control flex-1">
+                                <label class="label">
+                                    <span class="label-text">优先级</span>
+                                </label>
+                                <select id="prioritySelect" class="select select-bordered">
+                                    <option value="high">高</option>
+                                    <option value="medium" selected>中</option>
+                                    <option value="low">低</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button onclick="generateTestCases()" class="btn btn-primary">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            生成用例
+                        </button>
+                        
+                        <div id="generatedCases" class="mt-6 space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UI 自动化 -->
+            <div id="ui-automation-tab" class="tab-content hidden">
+                <div class="card bg-white shadow">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4">UI 自动化测试</h2>
+                        <div class="tabs tabs-boxed mb-4">
+                            <a class="tab tab-active" onclick="switchAutomationTab('locator')">定位器生成</a>
+                            <a class="tab" onclick="switchAutomationTab('executor')">脚本执行</a>
+                            <a class="tab" onclick="switchAutomationTab('recorder')">录制回放</a>
+                        </div>
+                        
+                        <div id="automationLocator" class="automation-panel">
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">页面 URL</span>
+                                </label>
+                                <input type="text" id="pageUrl" class="input input-bordered" placeholder="https://example.com"/>
+                            </div>
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">元素描述</span>
+                                </label>
+                                <input type="text" id="elementDesc" class="input input-bordered" placeholder="例如：登录按钮"/>
+                            </div>
+                            <button onclick="generateLocator()" class="btn btn-secondary">生成定位器</button>
+                            <div id="locatorResult" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                                <pre class="text-sm"></pre>
+                            </div>
+                        </div>
+                        
+                        <div id="automationExecutor" class="automation-panel hidden">
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">测试脚本</span>
+                                </label>
+                                <textarea id="testScript" class="textarea textarea-bordered h-32" placeholder="输入测试步骤..."></textarea>
+                            </div>
+                            <button onclick="executeTestScript()" class="btn btn-accent">执行脚本</button>
+                            <div id="executionResult" class="mt-4"></div>
+                        </div>
+                        
+                        <div id="automationRecorder" class="automation-panel hidden">
+                            <div class="text-center py-8">
+                                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                                <p class="text-gray-500">录制功能开发中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 测试执行 -->
+            <div id="test-runs-tab" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">测试执行记录</h2>
+                    <button onclick="createTestRun()" class="btn btn-primary btn-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        </svg>
+                        新建执行
+                    </button>
+                </div>
+                <div class="card bg-white shadow">
+                    <div class="card-body">
+                        <div class="overflow-x-auto">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>名称</th>
+                                        <th>类型</th>
+                                        <th>用例数</th>
+                                        <th>通过</th>
+                                        <th>失败</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="testRunsTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 缺陷管理 -->
+            <div id="defects-tab" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">缺陷管理</h2>
+                    <button onclick="showCreateDefectModal()" class="btn btn-error btn-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        新建缺陷
+                    </button>
+                </div>
+                <div class="card bg-white shadow">
+                    <div class="card-body">
+                        <div class="overflow-x-auto">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>标题</th>
+                                        <th>严重程度</th>
+                                        <th>状态</th>
+                                        <th>负责人</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="defectsTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 报告导出 -->
+            <div id="reports-tab" class="tab-content hidden">
+                <div class="card bg-white shadow">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4">测试报告导出</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">选择测试执行</span>
+                                </label>
+                                <select id="reportTestRunSelect" class="select select-bordered"></select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">导出格式</span>
+                                </label>
+                                <select id="reportFormat" class="select select-bordered">
+                                    <option value="html">HTML</option>
+                                    <option value="pdf">PDF</option>
+                                    <option value="excel">Excel</option>
+                                    <option value="word">Word</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text"> </span>
+                                </label>
+                                <button onclick="exportReport()" class="btn btn-success w-full">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    导出报告
+                                </button>
+                            </div>
+                        </div>
+                        <div id="reportPreview" class="border rounded p-4 min-h-64 bg-gray-50"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 创建项目模态框 -->
+    <dialog id="createProjectModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">创建新项目</h3>
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">项目名称 *</span>
+                </label>
+                <input type="text" id="newProjectName" class="input input-bordered" required/>
+            </div>
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">项目描述</span>
+                </label>
+                <textarea id="newProjectDesc" class="textarea textarea-bordered h-24"></textarea>
+            </div>
+            <div class="modal-action">
+                <button onclick="closeCreateProjectModal()" class="btn">取消</button>
+                <button onclick="submitCreateProject()" class="btn btn-primary">创建</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>关闭</button>
+        </form>
+    </dialog>
+
+    <!-- 创建缺陷模态框 -->
+    <dialog id="createDefectModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">创建缺陷</h3>
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">缺陷标题 *</span>
+                </label>
+                <input type="text" id="newDefectTitle" class="input input-bordered" required/>
+            </div>
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">描述</span>
+                </label>
+                <textarea id="newDefectDesc" class="textarea textarea-bordered h-24"></textarea>
+            </div>
+            <div class="flex gap-4 mb-4">
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">严重程度</span>
+                    </label>
+                    <select id="newDefectSeverity" class="select select-bordered">
+                        <option value="critical">严重</option>
+                        <option value="major">主要</option>
+                        <option value="minor">次要</option>
+                        <option value="trivial">轻微</option>
+                    </select>
+                </div>
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">负责人</span>
+                    </label>
+                    <input type="text" id="newDefectAssignee" class="input input-bordered"/>
+                </div>
+            </div>
+            <div class="modal-action">
+                <button onclick="closeCreateDefectModal()" class="btn">取消</button>
+                <button onclick="submitCreateDefect()" class="btn btn-error">创建</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>关闭</button>
+        </form>
+    </dialog>
+
+    <!-- Toast 通知 -->
+    <div id="toastContainer" class="toast toast-end z-50"></div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        let socket = null;
+        let currentProjectId = null;
+        let currentUser = 'user_' + Math.random().toString(36).substr(2, 6);
+        
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            initSocket();
+            loadProjects();
+            showWelcomeMessage();
+        });
+        
+        // ==================== WebSocket 连接 ====================
+        function initSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                updateConnectionStatus(true);
+                console.log('Connected to server');
+            });
+            
+            socket.on('disconnect', function() {
+                updateConnectionStatus(false);
+                console.log('Disconnected from server');
+            });
+            
+            socket.on('project_created', function(data) {
+                showToast('新项目已创建：' + data.project.name, 'success');
+                loadProjects();
+            });
+            
+            socket.on('test_case_created', function(data) {
+                showToast('新用例已添加', 'success');
+                if (currentProjectId) loadTestCases(currentProjectId);
+            });
+            
+            socket.on('test_run_completed', function(data) {
+                showToast('测试执行完成', 'success');
+                if (currentProjectId) {
+                    loadTestRuns(currentProjectId);
+                    updateDashboard();
+                }
+            });
+            
+            socket.on('defect_created', function(data) {
+                showToast('新缺陷已记录', 'info');
+                if (currentProjectId) loadDefects(currentProjectId);
+            });
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.innerHTML = '<span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span><span class="text-sm">已连接</span>';
+            } else {
+                statusEl.innerHTML = '<span class="w-2 h-2 bg-red-400 rounded-full"></span><span class="text-sm">已断开</span>';
+            }
+        }
+        
+        // ==================== 项目管理 ====================
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const data = await response.json();
+                
+                const selector = document.getElementById('projectSelector');
+                selector.innerHTML = '<option value="">选择项目...</option>';
+                
+                data.data.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    selector.appendChild(option);
+                });
+                
+                if (data.data.length > 0 && !currentProjectId) {
+                    currentProjectId = data.data[0].id;
+                    selector.value = currentProjectId;
+                    loadProject(currentProjectId);
+                }
+            } catch (error) {
+                showToast('加载项目失败：' + error.message, 'error');
+            }
+        }
+        
+        function loadProject(projectId) {
+            currentProjectId = projectId;
+            if (!projectId) return;
+            
+            updateDashboard();
+            loadTestCases(projectId);
+            loadTestRuns(projectId);
+            loadDefects(projectId);
+        }
+        
+        function showCreateProjectModal() {
+            document.getElementById('createProjectModal').showModal();
+        }
+        
+        function closeCreateProjectModal() {
+            document.getElementById('createProjectModal').close();
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('newProjectDesc').value = '';
+        }
+        
+        async function submitCreateProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const description = document.getElementById('newProjectDesc').value.trim();
+            
+            if (!name) {
+                showToast('请输入项目名称', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('项目创建成功', 'success');
+                    closeCreateProjectModal();
+                    loadProjects();
+                } else {
+                    showToast('创建失败：' + data.error, 'error');
+                }
+            } catch (error) {
+                showToast('请求失败：' + error.message, 'error');
+            }
+        }
+        
+        // ==================== 仪表盘 ====================
+        async function updateDashboard() {
+            if (!currentProjectId) return;
+            
+            try {
+                const [casesRes, runsRes, defectsRes] = await Promise.all([
+                    fetch(`/api/projects/${currentProjectId}/test-cases`),
+                    fetch(`/api/projects/${currentProjectId}/test-runs`),
+                    fetch(`/api/projects/${currentProjectId}/defects`)
+                ]);
+                
+                const casesData = await casesRes.json();
+                const runsData = await runsRes.json();
+                const defectsData = await defectsRes.json();
+                
+                const totalCases = casesData.data.length;
+                const lastRun = runsData.data[0];
+                const passRate = lastRun ? lastRun.pass_rate : 0;
+                const totalDefects = defectsData.data.length;
+                
+                document.getElementById('statTotalCases').textContent = totalCases;
+                document.getElementById('statPassRate').textContent = passRate.toFixed(1) + '%';
+                document.getElementById('statDefects').textContent = totalDefects;
+                document.getElementById('statLastRun').textContent = lastRun ? 
+                    new Date(lastRun.created_at).toLocaleDateString() : '-';
+                
+                // 更新最近执行列表
+                const recentRunsEl = document.getElementById('recentTestRuns');
+                recentRunsEl.innerHTML = runsData.data.slice(0, 5).map(run => `
+                    <tr>
+                        <td>${run.name}</td>
+                        <td><span class="badge badge-sm">${run.test_type}</span></td>
+                        <td><span class="status-badge status-${run.status}">${run.status}</span></td>
+                        <td>${run.pass_rate}%</td>
+                        <td>${new Date(run.created_at).toLocaleDateString()}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5" class="text-center text-gray-400">暂无数据</td></tr>';
+                
+            } catch (error) {
+                console.error('Dashboard update failed:', error);
+            }
+        }
+        
+        // ==================== 测试用例管理 ====================
+        async function loadTestCases(projectId) {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/test-cases`);
+                const data = await response.json();
+                
+                const container = document.getElementById('generatedCases');
+                if (container) {
+                    container.innerHTML = data.data.map(tc => `
+                        <div class="card bg-base-100 shadow-sm">
+                            <div class="card-body p-4">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-semibold">${tc.title}</h3>
+                                    <span class="badge badge-${tc.priority === 'high' ? 'error' : tc.priority === 'medium' ? 'warning' : 'info'} badge-sm">
+                                        ${tc.priority}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-2">${tc.description || ''}</p>
+                                <div class="text-xs text-gray-400 mt-2">
+                                    模型：${tc.ai_model || '-'} | 
+                                    创建：${new Date(tc.created_at).toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-gray-400 text-center py-8">暂无用例</p>';
+                }
+            } catch (error) {
+                console.error('Load test cases failed:', error);
+            }
+        }
+        
+        async function generateTestCases() {
+            const requirement = document.getElementById('requirementInput').value.trim();
+            const model = document.getElementById('aiModelSelect').value;
+            const priority = document.getElementById('prioritySelect').value;
+            
+            if (!requirement) {
+                showToast('请输入需求描述', 'error');
+                return;
+            }
+            
+            if (!currentProjectId) {
+                showToast('请先选择或创建项目', 'error');
+                return;
+            }
+            
+            showToast('正在生成测试用例...', 'info');
+            
+            try {
+                // 调用 AI 生成用例（这里简化处理，实际应调用后端 AI 服务）
+                const prompt = `请根据以下需求生成测试用例，格式为 JSON 数组，每个用例包含 title、description、steps（数组）、expected_result 字段：\n\n${requirement}`;
+                
+                // 模拟 AI 响应（实际应调用后端 API）
+                const mockCases = [
+                    {
+                        title: '验证用户登录功能',
+                        description: '测试用户使用正确凭据登录系统',
+                        steps: ['打开登录页面', '输入用户名', '输入密码', '点击登录按钮'],
+                        expected_result: '用户成功登录并跳转到首页'
+                    },
+                    {
+                        title: '验证空用户名处理',
+                        description: '测试用户名为空时的系统响应',
+                        steps: ['打开登录页面', '保持用户名为空', '输入密码', '点击登录按钮'],
+                        expected_result: '显示"用户名不能为空"的错误提示'
+                    }
+                ];
+                
+                // 保存到数据库
+                for (const testCase of mockCases) {
+                    await fetch(`/api/projects/${currentProjectId}/test-cases`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ...testCase,
+                            priority,
+                            ai_model: model
+                        })
+                    });
+                }
+                
+                showToast('生成 ' + mockCases.length + ' 个用例', 'success');
+                loadTestCases(currentProjectId);
+                updateDashboard();
+                
+            } catch (error) {
+                showToast('生成失败：' + error.message, 'error');
+            }
+        }
+        
+        // ==================== 测试执行管理 ====================
+        async function loadTestRuns(projectId) {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/test-runs`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('testRunsTable');
+                if (tbody) {
+                    tbody.innerHTML = data.data.map(run => `
+                        <tr>
+                            <td>${run.name}</td>
+                            <td><span class="badge badge-sm">${run.test_type}</span></td>
+                            <td>${run.total_cases}</td>
+                            <td class="text-success">${run.passed_cases}</td>
+                            <td class="text-error">${run.failed_cases}</td>
+                            <td><span class="status-badge status-${run.status}">${run.status}</span></td>
+                            <td>${new Date(run.created_at).toLocaleDateString()}</td>
+                            <td>
+                                ${run.status === 'pending' ? `
+                                    <button onclick="startTestRun(${run.id})" class="btn btn-xs btn-success">开始</button>
+                                ` : `
+                                    <button onclick="viewTestRun(${run.id})" class="btn btn-xs btn-ghost">查看</button>
+                                `}
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="8" class="text-center text-gray-400">暂无数据</td></tr>';
+                }
+                
+                // 更新报告下拉框
+                const reportSelect = document.getElementById('reportTestRunSelect');
+                if (reportSelect) {
+                    reportSelect.innerHTML = data.data.map(run => 
+                        `<option value="${run.id}">${run.name} (${run.status})</option>`
+                    ).join('');
+                }
+            } catch (error) {
+                console.error('Load test runs failed:', error);
+            }
+        }
+        
+        async function createTestRun() {
+            if (!currentProjectId) {
+                showToast('请先选择项目', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/projects/${currentProjectId}/test-runs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: 'Test Run ' + new Date().toISOString().slice(0, 19).replace(/[:-]/g, ''),
+                        test_type: 'ui'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('创建执行记录成功', 'success');
+                    loadTestRuns(currentProjectId);
+                }
+            } catch (error) {
+                showToast('创建失败：' + error.message, 'error');
+            }
+        }
+        
+        async function startTestRun(runId) {
+            try {
+                const response = await fetch(`/api/test-runs/${runId}/start`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('测试执行已开始', 'success');
+                    
+                    // 模拟测试执行过程
+                    setTimeout(() => completeTestRun(runId), 3000);
+                }
+            } catch (error) {
+                showToast('启动失败：' + error.message, 'error');
+            }
+        }
+        
+        async function completeTestRun(runId) {
+            try {
+                const response = await fetch(`/api/test-runs/${runId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: 'completed',
+                        passed_cases: Math.floor(Math.random() * 8) + 2,
+                        failed_cases: Math.floor(Math.random() * 2)
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('测试执行完成', 'success');
+                    loadTestRuns(currentProjectId);
+                    updateDashboard();
+                }
+            } catch (error) {
+                showToast('完成失败：' + error.message, 'error');
+            }
+        }
+        
+        // ==================== 缺陷管理 ====================
+        async function loadDefects(projectId) {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/defects`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('defectsTable');
+                if (tbody) {
+                    tbody.innerHTML = data.data.map(defect => `
+                        <tr>
+                            <td>#${defect.id}</td>
+                            <td>${defect.title}</td>
+                            <td><span class="badge badge-${defect.severity === 'critical' ? 'error' : defect.severity === 'major' ? 'warning' : 'info'} badge-sm">${defect.severity}</span></td>
+                            <td><span class="status-badge status-${defect.status === 'open' ? 'fail' : 'pass'}">${defect.status}</span></td>
+                            <td>${defect.assigned_to || '-'}</td>
+                            <td>${new Date(defect.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <button onclick="editDefect(${defect.id})" class="btn btn-xs btn-ghost">编辑</button>
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7" class="text-center text-gray-400">暂无数据</td></tr>';
+                }
+            } catch (error) {
+                console.error('Load defects failed:', error);
+            }
+        }
+        
+        function showCreateDefectModal() {
+            document.getElementById('createDefectModal').showModal();
+        }
+        
+        function closeCreateDefectModal() {
+            document.getElementById('createDefectModal').close();
+            document.getElementById('newDefectTitle').value = '';
+            document.getElementById('newDefectDesc').value = '';
+            document.getElementById('newDefectAssignee').value = '';
+        }
+        
+        async function submitCreateDefect() {
+            const title = document.getElementById('newDefectTitle').value.trim();
+            const description = document.getElementById('newDefectDesc').value.trim();
+            const severity = document.getElementById('newDefectSeverity').value;
+            const assigned_to = document.getElementById('newDefectAssignee').value.trim();
+            
+            if (!title) {
+                showToast('请输入缺陷标题', 'error');
+                return;
+            }
+            
+            if (!currentProjectId) {
+                showToast('请先选择项目', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/projects/${currentProjectId}/defects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, severity, assigned_to })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('缺陷创建成功', 'success');
+                    closeCreateDefectModal();
+                    loadDefects(currentProjectId);
+                    updateDashboard();
+                } else {
+                    showToast('创建失败：' + data.error, 'error');
+                }
+            } catch (error) {
+                showToast('请求失败：' + error.message, 'error');
+            }
+        }
+        
+        // ==================== 报告导出 ====================
+        async function exportReport() {
+            const testRunId = document.getElementById('reportTestRunSelect').value;
+            const format = document.getElementById('reportFormat').value;
+            
+            if (!testRunId) {
+                showToast('请选择测试执行记录', 'error');
+                return;
+            }
+            
+            showToast('正在生成报告...', 'info');
+            
+            // 模拟报告生成
+            setTimeout(() => {
+                const preview = document.getElementById('reportPreview');
+                preview.innerHTML = `
+                    <div class="prose max-w-none">
+                        <h3 class="text-lg font-bold mb-4">测试报告</h3>
+                        <p><strong>格式：</strong>${format.toUpperCase()}</p>
+                        <p><strong>生成时间：</strong>${new Date().toLocaleString()}</p>
+                        <p class="text-green-600 mt-4">✓ 报告已准备就绪，点击下载</p>
+                    </div>
+                `;
+                showToast('报告生成成功', 'success');
+            }, 1500);
+        }
+        
+        // ==================== UI 自动化 ====================
+        function switchAutomationTab(tab) {
+            document.querySelectorAll('.automation-panel').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('#ui-automation-tab .tab').forEach(el => el.classList.remove('tab-active'));
+            
+            document.getElementById('automation' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
+            event.target.classList.add('tab-active');
+        }
+        
+        async function generateLocator() {
+            const url = document.getElementById('pageUrl').value.trim();
+            const desc = document.getElementById('elementDesc').value.trim();
+            
+            if (!url || !desc) {
+                showToast('请填写 URL 和元素描述', 'error');
+                return;
+            }
+            
+            showToast('正在生成定位器...', 'info');
+            
+            // 模拟定位器生成
+            setTimeout(() => {
+                const result = document.getElementById('locatorResult');
+                result.querySelector('pre').textContent = JSON.stringify({
+                    url: url,
+                    element: desc,
+                    locators: [
+                        { type: 'id', value: 'login-btn' },
+                        { type: 'css', value: 'button[type="submit"]' },
+                        { type: 'xpath', value: '//button[@type="submit"]' }
+                    ],
+                    confidence: 0.92
+                }, null, 2);
+                result.classList.remove('hidden');
+                showToast('定位器生成成功', 'success');
+            }, 1000);
+        }
+        
+        async function executeTestScript() {
+            const script = document.getElementById('testScript').value.trim();
+            
+            if (!script) {
+                showToast('请输入测试脚本', 'error');
+                return;
+            }
+            
+            showToast('正在执行脚本...', 'info');
+            
+            // 模拟脚本执行
+            setTimeout(() => {
+                const result = document.getElementById('executionResult');
+                result.innerHTML = `
+                    <div class="alert alert-success">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>脚本执行成功！耗时：1.2s</span>
+                    </div>
+                `;
+                showToast('脚本执行完成', 'success');
+            }, 1500);
+        }
+        
+        // ==================== 工具函数 ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            event.currentTarget.classList.add('active');
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type} shadow-lg mb-2`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        function showWelcomeMessage() {
+            showToast('欢迎使用 AI Test Hub v3.0！', 'success');
+        }
+        
+        function toggleCollaboration() {
+            showToast('协作功能开发中...', 'info');
+        }
+        
+        function showUserProfile() {
+            showToast('用户：' + currentUser, 'info');
+        }
+        
+        function logout() {
+            showToast('退出登录', 'info');
+        }
+    </script>
+</body>
+</html>

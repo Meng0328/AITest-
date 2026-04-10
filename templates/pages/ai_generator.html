@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}AI 用例生成 - AI Test Hub{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow">
+    <div class="card-body">
+        <h2 class="card-title mb-4">AI 测试用例生成</h2>
+        
+        <!-- 文档上传区域 -->
+        <div class="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center" id="dropZone">
+            <svg class="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <p class="text-gray-600">拖拽文件到此处或点击上传</p>
+            <p class="text-xs text-gray-400 mt-1">支持 Word/Excel/PDF/图片格式</p>
+            <input type="file" id="docUpload" class="hidden" multiple accept=".docx,.xlsx,.pdf,.png,.jpg,.jpeg"/>
+            <button onclick="document.getElementById('docUpload').click()" class="btn btn-sm btn-outline mt-2">选择文件</button>
+        </div>
+        
+        <!-- 已上传文件列表 -->
+        <div id="uploadedDocs" class="mb-4 space-y-2"></div>
+        
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">需求文档/用户故事</span>
+            </label>
+            <textarea id="requirementInput" class="textarea textarea-bordered h-40" placeholder="请输入需求描述或粘贴用户故事..."></textarea>
+        </div>
+        
+        <div class="flex gap-4 mb-4">
+            <div class="form-control flex-1">
+                <label class="label">
+                    <span class="label-text">AI 模型</span>
+                </label>
+                <select id="aiModelSelect" class="select select-bordered">
+                    <option value="auto">自动选择（推荐）</option>
+                    <option value="qwen-plus">Qwen Plus</option>
+                    <option value="deepseek-v3">DeepSeek V3</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="ernie-bot">文心一言</option>
+                </select>
+            </div>
+            <div class="form-control flex-1">
+                <label class="label">
+                    <span class="label-text">优先级</span>
+                </label>
+                <select id="prioritySelect" class="select select-bordered">
+                    <option value="high">高</option>
+                    <option value="medium" selected>中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="generateTestCases()" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                生成用例
+            </button>
+            <button onclick="clearGeneratedCases()" class="btn btn-ghost">清空结果</button>
+        </div>
+        
+        <!-- 生成进度 -->
+        <div id="generationProgress" class="hidden mt-4">
+            <progress class="progress progress-primary w-full"></progress>
+            <p class="text-sm text-gray-600 mt-2">正在分析需求并生成测试用例...</p>
+        </div>
+        
+        <!-- 生成的用例列表 -->
+        <div id="generatedCases" class="mt-6 space-y-4"></div>
+        
+        <!-- 批量操作 -->
+        <div id="batchActions" class="hidden mt-4 pt-4 border-t">
+            <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">已选择 <span id="selectedCount">0</span> 个用例</span>
+                <div class="flex gap-2">
+                    <button onclick="saveSelectedCases()" class="btn btn-sm btn-success">保存选中</button>
+                    <button onclick="exportSelectedCases()" class="btn btn-sm btn-outline">导出选中</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 用例编辑模态框 -->
+<dialog id="caseEditModal" class="modal">
+    <div class="modal-box w-11/12 max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">编辑测试用例</h3>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">用例标题 *</span>
+            </label>
+            <input type="text" id="editCaseTitle" class="input input-bordered" required/>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">描述</span>
+            </label>
+            <textarea id="editCaseDesc" class="textarea textarea-bordered h-20"></textarea>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">测试步骤（JSON 格式）</span>
+            </label>
+            <textarea id="editCaseSteps" class="textarea textarea-bordered font-mono h-40"></textarea>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">预期结果</span>
+            </label>
+            <textarea id="editCaseExpected" class="textarea textarea-bordered h-20"></textarea>
+        </div>
+        <div class="flex gap-4 mb-4">
+            <div class="form-control flex-1">
+                <label class="label">
+                    <span class="label-text">优先级</span>
+                </label>
+                <select id="editCasePriority" class="select select-bordered">
+                    <option value="high">高</option>
+                    <option value="medium">中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-action">
+            <button onclick="closeCaseEditModal()" class="btn">取消</button>
+            <button onclick="saveCaseEdit()" class="btn btn-primary">保存</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>关闭</button>
+    </form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/aiGenerator.js') }}"></script>
+{% endblock %}

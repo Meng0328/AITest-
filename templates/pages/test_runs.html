@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}测试执行 - AI Test Hub{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-bold">测试执行记录</h2>
+    <button onclick="createTestRun()" class="btn btn-primary btn-sm">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+        </svg>
+        新建执行
+    </button>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 执行列表 -->
+    <div class="lg:col-span-2">
+        <div class="card bg-white shadow">
+            <div class="card-body">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex gap-2">
+                        <input type="text" placeholder="搜索执行记录..." class="input input-bordered input-sm" id="searchRuns"/>
+                        <select class="select select-bordered select-sm" id="filterType">
+                            <option value="">全部类型</option>
+                            <option value="ui">UI 自动化</option>
+                            <option value="api">API 测试</option>
+                            <option value="manual">手动测试</option>
+                        </select>
+                    </div>
+                    <select class="select select-bordered select-sm" id="sortBy">
+                        <option value="newest">最新优先</option>
+                        <option value="oldest">最旧优先</option>
+                    </select>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAllRuns"/></th>
+                                <th>名称</th>
+                                <th>类型</th>
+                                <th>用例数</th>
+                                <th>通过/失败</th>
+                                <th>状态</th>
+                                <th>时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="testRunsTable"></tbody>
+                    </table>
+                </div>
+                
+                <!-- 分页 -->
+                <div class="flex justify-center mt-4">
+                    <div class="join">
+                        <button class="join-item btn btn-sm">«</button>
+                        <button class="join-item btn btn-sm btn-active">1</button>
+                        <button class="join-item btn btn-sm">2</button>
+                        <button class="join-item btn btn-sm">3</button>
+                        <button class="join-item btn btn-sm">»</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 执行详情面板 -->
+    <div>
+        <div class="card bg-white shadow sticky top-4">
+            <div class="card-body">
+                <h3 class="font-bold text-lg mb-4">执行详情</h3>
+                <div id="runDetailPanel" class="text-center py-8 text-gray-400">
+                    <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <p>选择一条执行记录查看详情</p>
+                </div>
+                
+                <div id="runDetailContent" class="hidden">
+                    <div class="mb-4">
+                        <h4 class="font-semibold" id="detailName"></h4>
+                        <span class="badge badge-sm mt-1" id="detailType"></span>
+                        <span class="badge badge-sm ml-2" id="detailStatus"></span>
+                    </div>
+                    
+                    <div class="stats stats-vertical shadow w-full mb-4">
+                        <div class="stat">
+                            <div class="stat-title">总用例</div>
+                            <div class="stat-value text-info" id="detailTotal">0</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">通过</div>
+                            <div class="stat-value text-success" id="detailPassed">0</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">失败</div>
+                            <div class="stat-value text-error" id="detailFailed">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="font-semibold text-sm mb-2">通过率</h5>
+                        <progress class="progress progress-success w-full" id="detailPassRate" value="0" max="100"></progress>
+                        <div class="text-right text-xs text-gray-500" id="detailPassRateText">0%</div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-2">
+                        <button onclick="viewReport()" class="btn btn-sm btn-outline">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            查看报告
+                        </button>
+                        <button onclick="rerunTest()" class="btn btn-sm btn-primary">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            重新执行
+                        </button>
+                        <button onclick="deleteTestRun()" class="btn btn-sm btn-ghost text-error">删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新建执行模态框 -->
+<dialog id="createRunModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">新建测试执行</h3>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">执行名称</span>
+            </label>
+            <input type="text" id="newRunName" class="input input-bordered" placeholder="自动生成为默认"/>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">执行类型</span>
+            </label>
+            <select id="newRunType" class="select select-bordered">
+                <option value="ui">UI 自动化</option>
+                <option value="api">API 测试</option>
+                <option value="manual">手动测试</option>
+            </select>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">选择用例</span>
+            </label>
+            <div class="border rounded p-2 h-32 overflow-auto" id="caseSelectionList">
+                <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" class="checkbox checkbox-sm case-checkbox" value="1"/>
+                    <span>所有用例</span>
+                </label>
+            </div>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">执行模式</span>
+            </label>
+            <select id="newRunMode" class="select select-bordered">
+                <option value="normal">正常执行</option>
+                <option value="debug">调试模式（单步）</option>
+                <option value="parallel">并行执行</option>
+            </select>
+        </div>
+        <div class="modal-action">
+            <button onclick="closeCreateRunModal()" class="btn">取消</button>
+            <button onclick="submitCreateRun()" class="btn btn-primary">创建</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">

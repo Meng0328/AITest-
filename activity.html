@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作记录审计 - AI Test Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+                    colors: { primary: '#2563EB', secondary: '#3B82F6', accent: '#F97316', bg: '#F8FAFC', text: '#1E293B' }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        .nav-item.active { background-color: #EFF6FF; color: #2563EB; border-right: 3px solid #2563EB; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15); }
+        .btn-primary { background-color: #2563EB; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }
+        .btn-primary:hover { background-color: #1D4ED8; }
+        .btn-secondary { background-color: #F1F5F9; color: #475569; padding: 10px 20px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-secondary:hover { background-color: #E2E8F0; }
+        .btn-danger { background-color: #EF4444; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-danger:hover { background-color: #DC2626; }
+        .input-field { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; width: 100%; transition: all 0.2s ease; }
+        .input-field:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1500; }
+        .modal-backdrop.open { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; }
+        .toast { background: white; border-radius: 8px; padding: 14px 20px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 380px; }
+        .toast.success { border-left: 4px solid #10B981; }
+        .toast.error { border-left: 4px solid #EF4444; }
+        .toast.warning { border-left: 4px solid #F59E0B; }
+        .toast.info { border-left: 4px solid #2563EB; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* Timeline Styles */
+        .timeline { position: relative; padding-left: 32px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #E2E8F0;
+        }
+        .timeline-item { position: relative; padding-bottom: 24px; }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute;
+            left: -28px;
+            top: 4px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #E2E8F0;
+        }
+        .timeline-dot.action { background-color: #2563EB; }
+        .timeline-dot.generation { background-color: #10B981; }
+        .timeline-dot.export { background-color: #F59E0B; }
+        .timeline-dot.error { background-color: #EF4444; }
+        .timeline-dot.system { background-color: #6B7280; }
+    </style>
+</head>
+<body class="bg-bg text-text h-screen flex overflow-hidden">
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Detail Modal -->
+    <div class="modal-backdrop" id="detail-modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold">操作详情</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500">时间:</span>
+                        <p id="detail-time" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">类型:</span>
+                        <p id="detail-type" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">用户:</span>
+                        <p id="detail-user" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">IP 地址:</span>
+                        <p id="detail-ip" class="font-medium font-mono"></p>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-gray-500 text-sm">操作描述:</span>
+                    <p id="detail-description" class="mt-1 p-3 bg-gray-50 rounded text-sm"></p>
+                </div>
+                <div id="detail-metadata-container">
+                    <span class="text-gray-500 text-sm">附加信息:</span>
+                    <pre id="detail-metadata" class="mt-1 p-3 bg-gray-50 rounded text-xs overflow-x-auto"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <h1 class="text-xl font-bold text-primary">操作记录审计</h1>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">用户行为追踪与审计日志</p>
+        </div>
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <a href="index.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span>返回工作台</span>
+            </a>
+            <a href="history.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>历史记录</span>
+            </a>
+            <a href="files.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+                <span>文件存储</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-200">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-semibold">A</div>
+                <div>
+                    <p class="text-sm font-medium">操作审计模块</p>
+                    <p class="text-xs text-green-600">● 独立运行</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">用户操作审计日志</h2>
+                <p class="text-sm text-gray-500">追踪、分析和导出所有用户操作行为</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="btn-secondary text-sm" onclick="exportActivityCSV()">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    导出 CSV
+                </button>
+                <button class="btn-secondary text-sm" onclick="toggleRealtime()">
+                    <svg class="w-4 h-4 inline mr-1" id="realtime-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span id="realtime-status">实时监听：开</span>
+                </button>
+                <button class="btn-danger text-sm" onclick="clearAllActivity()">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    清空日志
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-primary" id="stat-total">0</span>
+                    </div>
+                    <h3 class="font-semibold">总操作数</h3>
+                    <p class="text-sm text-gray-500">所有用户操作记录</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-green-600" id="stat-generation">0</span>
+                    </div>
+                    <h3 class="font-semibold">AI 生成</h3>
+                    <p class="text-sm text-gray-500">调用 AI 生成次数</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-orange-600" id="stat-action">0</span>
+                    </div>
+                    <h3 class="font-semibold">功能操作</h3>
+                    <p class="text-sm text-gray-500">功能模块使用次数</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-purple-600" id="stat-export">0</span>
+                    </div>
+                    <h3 class="font-semibold">导出操作</h3>
+                    <p class="text-sm text-gray-500">数据导出次数</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-red-600" id="stat-error">0</span>
+                    </div>
+                    <h3 class="font-semibold">错误记录</h3>
+                    <p class="text-sm text-gray-500">操作失败次数</p>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                <div class="flex flex-wrap gap-3">
+                    <input type="text" id="search-input" class="input-field flex-1 min-w-[250px]" placeholder="搜索操作描述、用户、IP..." oninput="renderActivityList()">
+                    <select id="filter-type" class="text-sm border rounded px-3 py-2" onchange="renderActivityList()">
+                        <option value="">全部类型</option>
+                        <option value="action">功能操作</option>
+                        <option value="generation">AI 生成</option>
+                        <option value="export">数据导出</option>
+                        <option value="error">错误记录</option>
+                        <option value="system">系统事件</option>
+                    </select>
+                    <select id="filter-module" class="text-sm border rounded px-3 py-2" onchange="renderActivityList()">
+                        <option value="">全部模块</option>
+                        <option value="ui-automation">UI 自动化</option>
+                        <option value="ai-generation">AI 生成</option>
+                        <option value="file-storage">文件存储</option>
+                        <option value="history">历史记录</option>
+                        <option value="qa-center">质量中心</option>
+                    </select>
+                    <input type="date" id="filter-date-from" class="text-sm border rounded px-3 py-2" onchange="renderActivityList()">
+                    <span class="text-gray-400 self-center">至</span>
+                    <input type="date" id="filter-date-to" class="text-sm border rounded px-3 py-2" onchange="renderActivityList()">
+                </div>
+            </div>
+
+            <!-- Activity Timeline -->
+            <div class="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    操作时间线
+                </h3>
+                <div class="timeline" id="activity-timeline"></div>
+                <div class="mt-6 pt-4 border-t flex items-center justify-between">
+                    <span class="text-sm text-gray-500" id="pagination-info">共 0 条记录</span>
+                    <div class="flex items-center gap-2">
+                        <button class="btn-secondary text-xs" onclick="changePage(-1)" id="prev-page-btn" disabled>上一页</button>
+                        <span class="text-sm" id="page-indicator">第 1 页</span>
+                        <button class="btn-secondary text-xs" onclick="changePage(1)" id="next-page-btn" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+// ==================== 操作记录审计核心逻辑 ====================
+let currentPage = 1;
+const pageSize = 30;
+let realtimeEnabled = true;
+let activityListener = null;
+
+// 获取操作记录
+function getActivity() {
+    return JSON.parse(localStorage.getItem('activityLog') || '[]');
+}
+
+// 保存操作记录
+function saveActivity(activities) {
+    localStorage.setItem('activityLog', JSON.stringify(activities));
+    updateStats();
+    renderActivityList();
+}
+
+// 添加操作记录
+function addActivity(type, description, metadata = {}) {
+    const activities = getActivity();
+    const record = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        type, // action | generation | export | error | system
+        description,
+        module: metadata.module || 'unknown',
+        user: metadata.user || 'anonymous',
+        ip: metadata.ip || '127.0.0.1',
+        metadata
+    };
+    
+    activities.unshift(record);
+    
+    // 保留最近 1000 条
+    if (activities.length > 1000) {
+        activities.splice(500);
+    }
+    
+    saveActivity(activities);
+    return record;
+}
+
+// 暴露给全局供其他模块调用
+window.ActivityLogger = {
+    log: addActivity,
+    action: (desc, meta) => addActivity('action', desc, meta),
+    generation: (desc, meta) => addActivity('generation', desc, meta),
+    export: (desc, meta) => addActivity('export', desc, meta),
+    error: (desc, meta) => addActivity('error', desc, meta),
+    system: (desc, meta) => addActivity('system', desc, meta)
+};
+
+// 更新统计数据
+function updateStats() {
+    const activities = getActivity();
+    document.getElementById('stat-total').textContent = activities.length;
+    document.getElementById('stat-generation').textContent = activities.filter(a => a.type === 'generation').length;
+    document.getElementById('stat-action').textContent = activities.filter(a => a.type === 'action').length;
+    document.getElementById('stat-export').textContent = activities.filter(a => a.type === 'export').length;
+    document.getElementById('stat-error').textContent = activities.filter(a => a.type === 'error').length;
+}
+
+// 渲染时间线
+function renderActivityList() {
+    const activities = getActivity();
+    const filtered = filterActivities(activities);
+    
+    // 分页
+    const totalPages = Math.ceil(filtered.length / pageSize);
+    currentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageData = filtered.slice(startIndex, endIndex);
+    
+    const timeline = document.getElementById('activity-timeline');
+    timeline.innerHTML = pageData.map(a => `
+        <div class="timeline-item">
+            <div class="timeline-dot ${a.type}"></div>
+            <div class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer" onclick="viewDetail(${a.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 text-xs rounded font-medium ${getTypeBadgeClass(a.type)}">${getTypeLabel(a.type)}</span>
+                            <span class="text-xs text-gray-500">${a.module}</span>
+                        </div>
+                        <p class="text-sm font-medium text-gray-800">${a.description}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">${new Date(a.timestamp).toLocaleString('zh-CN')}</p>
+                        <p class="text-xs text-gray-400 font-mono mt-1">${a.user}</p>
+                    </div>
+                </div>
+                ${a.metadata && Object.keys(a.metadata).length > 0 ? `
+                    <div class="mt-2 pt-2 border-t border-gray-200">
+                        <p class="text-xs text-gray-500 truncate">${JSON.stringify(a.metadata).substring(0, 100)}...</p>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+    
+    // 更新分页信息
+    document.getElementById('pagination-info').textContent = `共 ${filtered.length} 条记录`;
+    document.getElementById('page-indicator').textContent = `第 ${currentPage} 页 / 共 ${totalPages || 1} 页`;
+    document.getElementById('prev-page-btn').disabled = currentPage <= 1;
+    document.getElementById('next-page-btn').disabled = currentPage >= totalPages;
+}
+
+// 筛选逻辑
+function filterActivities(activities) {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const type = document.getElementById('filter-type').value;
+    const moduleFilter = document.getElementById('filter-module').value;
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    
+    return activities.filter(a => {
+        const matchSearch = !search || 
+            a.description.toLowerCase().includes(search) ||
+            a.user.toLowerCase().includes(search) ||
+            a.ip.includes(search);
+        
+        const matchType = !type || a.type === type;
+        const matchModule = !moduleFilter || a.module === moduleFilter;
+        
+        const recordDate = a.timestamp.split('T')[0];
+        const matchDateFrom = !dateFrom || recordDate >= dateFrom;
+        const matchDateTo = !dateTo || recordDate <= dateTo;
+        
+        return matchSearch && matchType && matchModule && matchDateFrom && matchDateTo;
+    });
+}
+
+// 类型标签样式
+function getTypeBadgeClass(type) {
+    const map = {
+        action: 'bg-blue-100 text-blue-700',
+        generation: 'bg-green-100 text-green-700',
+        export: 'bg-orange-100 text-orange-700',
+        error: 'bg-red-100 text-red-700',
+        system: 'bg-gray-100 text-gray-700'
+    };
+    return map[type] || 'bg-gray-100 text-gray-700';
+}
+
+function getTypeLabel(type) {
+    const map = {
+        action: '功能操作',
+        generation: 'AI 生成',
+        export: '数据导出',
+        error: '错误记录',
+        system: '系统事件'
+    };
+    return map[type] || type;
+}
+
+// 查看详情
+function viewDetail(id) {
+    const activities = getActivity();
+    const record = activities.find(a => a.id === id);
+    if (!record) return;
+    
+    document.getElementById('detail-time').textContent = new Date(record.timestamp).toLocaleString('zh-CN');
+    document.getElementById('detail-type').innerHTML = `<span class="px-2 py-1 text-xs rounded ${getTypeBadgeClass(record.type)}">${getTypeLabel(record.type)}</span>`;
+    document.getElementById('detail-user').textContent = record.user;
+    document.getElementById('detail-ip').textContent = record.ip;
+    document.getElementById('detail-description').textContent = record.description;
+    
+    const metadataContainer = document.getElementById('detail-metadata-container');
+    const metadataEl = document.getElementById('detail-metadata');
+    
+    if (record.metadata && Object.keys(record.metadata).length > 0) {
+        metadataContainer.style.display = 'block';
+        metadataEl.textContent = JSON.stringify(record.metadata, null, 2);
+    } else {
+        metadataContainer.style.display = 'none';
+    }
+    
+    document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal').classList.remove('open');
+}
+
+// 分页操作
+function changePage(delta) {
+    currentPage += delta;
+    renderActivityList();
+}
+
+// 导出 CSV
+function exportActivityCSV() {
+    const activities = getActivity();
+    const csv = [
+        ['时间', '类型', '模块', '用户', 'IP', '描述', '元数据'].join(','),
+        ...activities.map(a => [
+            a.timestamp,
+            a.type,
+            a.module,
+            a.user,
+            a.ip,
+            `"${a.description.replace(/"/g, '""').replace(/\n/g, '\\n')}"`,
+            `"${JSON.stringify(a.metadata).replace(/"/g, '""')}"`
+        ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `activity_log_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV 已导出', 'success');
+}
+
+// 清空日志
+function clearAllActivity() {
+    if (!confirm('确定清空所有操作日志吗？此操作不可恢复！')) return;
+    localStorage.removeItem('activityLog');
+    updateStats();
+    renderActivityList();
+    showToast('操作日志已清空', 'success');
+}
+
+// 切换实时监听
+function toggleRealtime() {
+    realtimeEnabled = !realtimeEnabled;
+    document.getElementById('realtime-status').textContent = `实时监听：${realtimeEnabled ? '开' : '关'}`;
+    document.getElementById('realtime-icon').classList.toggle('text-yellow-500');
+    
+    if (realtimeEnabled) {
+        startRealtimeListener();
+    } else {
+        stopRealtimeListener();
+    }
+}
+
+// 实时监听 storage 事件（跨标签页同步）
+function startRealtimeListener() {
+    if (activityListener) return;
+    
+    activityListener = (event) => {
+        if (event.key === 'activityLog') {
+            updateStats();
+            renderActivityList();
+            showToast('新操作记录已同步', 'info');
+        }
+    };
+    
+    window.addEventListener('storage', activityListener);
+}
+
+function stopRealtimeListener() {
+    if (activityListener) {
+        window.removeEventListener('storage', activityListener);
+        activityListener = null;
+    }
+}
+
+// Toast 通知
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <svg class="w-5 h-5 ${type === 'success' ? 'text-green-500' : type === 'error' ? 'text-red-500' : type === 'warning' ? 'text-yellow-500' : 'text-blue-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${type === 'success' ? 'M5 13l4 4L19 7' : type === 'error' ? 'M6 18L18 6M6 6l12 12' : 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
+        </svg>
+        <span>${message}</span>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// 模拟一些测试数据
+function seedTestData() {
+    const testActivities = [
+        { type: 'system', description: '系统初始化完成', module: 'system', user: 'admin' },
+        { type: 'action', description: '加载测试页面：https://example.com', module: 'ui-automation', user: 'tester' },
+        { type: 'generation', description: 'AI 生成测试用例：登录功能测试', module: 'ai-generation', user: 'tester', metadata: { model: 'Deepseek-V3', provider: 'csdn' } },
+        { type: 'action', description: '执行 UI 自动化脚本', module: 'ui-automation', user: 'tester' },
+        { type: 'export', description: '导出测试报告 HTML 格式', module: 'ui-automation', user: 'tester' },
+        { type: 'error', description: '元素定位失败：XPath 表达式无效', module: 'ui-automation', user: 'tester', metadata: { error: 'Invalid XPath' } },
+        { type: 'generation', description: 'AI 生成测试用例：购物车功能', module: 'ai-generation', user: 'developer' },
+        { type: 'action', description: '上传需求文档：requirements.md', module: 'file-storage', user: 'developer' },
+        { type: 'system', description: '自动备份历史记录', module: 'history', user: 'system' },
+        { type: 'export', description: '导出 HuggingFace 训练数据集', module: 'history', user: 'ml-engineer' }
+    ];
+    
+    const now = Date.now();
+    const activities = testActivities.map((a, i) => ({
+        id: now - i * 60000,
+        timestamp: new Date(now - i * 60000).toISOString(),
+        ...a,
+        ip: '192.168.1.' + (i % 255)
+    }));
+    
+    const existing = getActivity();
+    if (existing.length === 0) {
+        saveActivity(activities);
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    seedTestData();
+    updateStats();
+    renderActivityList();
+    startRealtimeListener();
+});
+    </script>
+</body>
+</html>

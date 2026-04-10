@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录中心 - AI Test Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+                    colors: { primary: '#2563EB', secondary: '#3B82F6', accent: '#F97316', bg: '#F8FAFC', text: '#1E293B' }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        .nav-item.active { background-color: #EFF6FF; color: #2563EB; border-right: 3px solid #2563EB; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15); }
+        .btn-primary { background-color: #2563EB; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }
+        .btn-primary:hover { background-color: #1D4ED8; }
+        .btn-secondary { background-color: #F1F5F9; color: #475569; padding: 10px 20px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-secondary:hover { background-color: #E2E8F0; }
+        .btn-danger { background-color: #EF4444; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-danger:hover { background-color: #DC2626; }
+        .input-field { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; width: 100%; transition: all 0.2s ease; }
+        .input-field:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1500; }
+        .modal-backdrop.open { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; }
+        .toast { background: white; border-radius: 8px; padding: 14px 20px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 380px; }
+        .toast.success { border-left: 4px solid #10B981; }
+        .toast.error { border-left: 4px solid #EF4444; }
+        .toast.warning { border-left: 4px solid #F59E0B; }
+        .toast.info { border-left: 4px solid #2563EB; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-bg text-text h-screen flex overflow-hidden">
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- View Detail Modal -->
+    <div class="modal-backdrop" id="view-modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold">历史记录详情</h3>
+                <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500">时间:</span>
+                        <span id="detail-timestamp" class="font-medium"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">模型:</span>
+                        <span id="detail-model" class="font-medium"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">状态:</span>
+                        <span id="detail-status" class="font-medium"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">准确率:</span>
+                        <span id="detail-accuracy" class="font-medium"></span>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">需求描述</h4>
+                    <div class="result-box p-3 bg-gray-50 rounded text-sm" id="detail-requirement"></div>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">生成结果</h4>
+                    <div class="result-box p-3 bg-gray-50 rounded text-sm markdown-body" id="detail-result" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+                <div class="flex gap-2">
+                    <button class="btn-primary flex-1" onclick="reuseCurrentRecord()">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        重新使用
+                    </button>
+                    <button class="btn-secondary flex-1" onclick="copyCurrentResult()">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                        复制结果
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compare Modal -->
+    <div class="modal-backdrop" id="compare-modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold">差异对比</h3>
+                <button onclick="closeCompareModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <h4 class="font-medium mb-2" id="compare-left-title">左侧</h4>
+                    <div class="result-box h-96 overflow-y-auto markdown-body" id="compare-left-content"></div>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2" id="compare-right-title">右侧</h4>
+                    <div class="result-box h-96 overflow-y-auto markdown-body" id="compare-right-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Tag Modal -->
+    <div class="modal-backdrop" id="batch-tag-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold">批量打标签</h3>
+                <button onclick="closeBatchTagModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">选择标签</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200" onclick="toggleTag('high-quality')">高质量</button>
+                        <button class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full hover:bg-green-200" onclick="toggleTag('training-ready')">可训练</button>
+                        <button class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full hover:bg-yellow-200" onclick="toggleTag('needs-review')">需审核</button>
+                        <button class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full hover:bg-red-200" onclick="toggleTag('low-quality')">低质量</button>
+                        <button class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200" onclick="toggleTag('edge-case')">边界案例</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">自定义标签</label>
+                    <input type="text" id="custom-tag-input" class="input-field" placeholder="输入自定义标签，逗号分隔">
+                </div>
+                <button class="btn-primary w-full" onclick="applyBatchTags()">应用标签</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h1 class="text-xl font-bold text-primary">历史记录中心</h1>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">AI 生成历史管理与复用</p>
+        </div>
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <a href="index.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span>返回工作台</span>
+            </a>
+            <a href="activity.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span>操作记录</span>
+            </a>
+            <a href="files.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+                <span>文件存储</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-200">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-semibold">H</div>
+                <div>
+                    <p class="text-sm font-medium">历史记录模块</p>
+                    <p class="text-xs text-green-600">● 独立运行</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">AI 生成历史记录</h2>
+                <p class="text-sm text-gray-500">管理、搜索、对比和复用历史生成结果</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="btn-secondary text-sm" onclick="exportHistoryCSV()">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    导出 CSV
+                </button>
+                <button class="btn-secondary text-sm" onclick="exportHistoryHF()">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    导出 HF 格式
+                </button>
+                <button class="btn-danger text-sm" onclick="clearAllHistory()">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    清空全部
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-primary" id="stat-total">0</span>
+                    </div>
+                    <h3 class="font-semibold">总记录数</h3>
+                    <p class="text-sm text-gray-500">所有历史生成记录</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-green-600" id="stat-success">0</span>
+                    </div>
+                    <h3 class="font-semibold">成功记录</h3>
+                    <p class="text-sm text-gray-500">生成成功的记录</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-orange-600" id="stat-avg-accuracy">0%</span>
+                    </div>
+                    <h3 class="font-semibold">平均准确率</h3>
+                    <p class="text-sm text-gray-500">已标注记录的均值</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 border border-gray-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-purple-600" id="stat-tagged">0</span>
+                    </div>
+                    <h3 class="font-semibold">已打标签</h3>
+                    <p class="text-sm text-gray-500">带有标签的记录</p>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                <div class="flex flex-wrap gap-3">
+                    <input type="text" id="search-input" class="input-field flex-1 min-w-[250px]" placeholder="搜索关键词（需求、模型、标签）..." oninput="renderHistoryTable()">
+                    <select id="filter-status" class="text-sm border rounded px-3 py-2" onchange="renderHistoryTable()">
+                        <option value="">全部状态</option>
+                        <option value="success">成功</option>
+                        <option value="failed">失败</option>
+                    </select>
+                    <select id="filter-model" class="text-sm border rounded px-3 py-2" onchange="renderHistoryTable()">
+                        <option value="">全部模型</option>
+                        <option value="Deepseek-V3">DeepSeek V3</option>
+                        <option value="qwen-vl-plus">Qwen VL Plus</option>
+                        <option value="glm-4">GLM-4</option>
+                        <option value="baichuan2">Baichuan2</option>
+                        <option value="yi-34b">Yi-34B</option>
+                    </select>
+                    <select id="filter-provider" class="text-sm border rounded px-3 py-2" onchange="renderHistoryTable()">
+                        <option value="">全部来源</option>
+                        <option value="csdn">CSDN</option>
+                        <option value="gitcode">GitCode AI</option>
+                    </select>
+                    <button class="btn-secondary" onclick="toggleAdvancedFilters()">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                        </svg>
+                        高级筛选
+                    </button>
+                </div>
+                <div id="advanced-filters" class="hidden mt-3 pt-3 border-t flex flex-wrap gap-3">
+                    <input type="date" id="filter-date-from" class="text-sm border rounded px-3 py-2" onchange="renderHistoryTable()">
+                    <span class="text-gray-400">至</span>
+                    <input type="date" id="filter-date-to" class="text-sm border rounded px-3 py-2" onchange="renderHistoryTable()">
+                    <input type="text" id="filter-tag" class="input-field flex-1 min-w-[200px] text-sm" placeholder="筛选标签..." oninput="renderHistoryTable()">
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="flex items-center gap-3 mb-4">
+                <button class="text-xs btn-secondary" onclick="batchTagSelected()" id="batch-tag-btn" disabled>
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    批量打标签
+                </button>
+                <button class="text-xs btn-secondary" onclick="compareSelected()" id="compare-btn" disabled>
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    差异对比
+                </button>
+                <span id="selected-count" class="text-xs text-gray-500">已选择 0 项</span>
+            </div>
+
+            <!-- History Table -->
+            <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr class="border-b">
+                                <th class="py-3 px-4 text-left"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">时间</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">模型</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">需求摘要</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">准确率</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">状态</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">标签</th>
+                                <th class="py-3 px-4 text-left font-medium text-gray-600">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-200 flex items-center justify-between">
+                    <span class="text-sm text-gray-500" id="pagination-info">共 0 条记录</span>
+                    <div class="flex items-center gap-2">
+                        <button class="btn-secondary text-xs" onclick="changePage(-1)" id="prev-page-btn" disabled>上一页</button>
+                        <span class="text-sm" id="page-indicator">第 1 页</span>
+                        <button class="btn-secondary text-xs" onclick="changePage(1)" id="next-page-btn" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+// ==================== 历史记录管理核心逻辑 ====================
+let currentPage = 1;
+const pageSize = 20;
+let selectedIds = [];
+let currentViewRecord = null;
+
+// 获取历史记录
+function getHistory() {
+    return JSON.parse(localStorage.getItem('aiHistory') || '[]');
+}
+
+// 保存历史记录
+function saveHistory(history) {
+    localStorage.setItem('aiHistory', JSON.stringify(history));
+    updateStats();
+    renderHistoryTable();
+}
+
+// 更新单条记录
+function updateHistoryItem(id, updates) {
+    const history = getHistory().map(h => h.id === id ? { ...h, ...updates } : h);
+    saveHistory(history);
+}
+
+// 删除记录
+function deleteHistoryItem(id) {
+    if (!confirm('确定删除这条记录吗？')) return;
+    const history = getHistory().filter(h => h.id !== id);
+    saveHistory(history);
+    showToast('记录已删除', 'success');
+}
+
+// 清空全部
+function clearAllHistory() {
+    if (!confirm('确定清空所有历史记录吗？此操作不可恢复！')) return;
+    localStorage.removeItem('aiHistory');
+    updateStats();
+    renderHistoryTable();
+    showToast('历史记录已清空', 'success');
+}
+
+// 更新统计数据
+function updateStats() {
+    const history = getHistory();
+    document.getElementById('stat-total').textContent = history.length;
+    document.getElementById('stat-success').textContent = history.filter(h => h.success).length;
+    
+    const labeledRecords = history.filter(h => h.accuracy !== null && h.accuracy !== undefined);
+    const avgAccuracy = labeledRecords.length > 0 
+        ? Math.round(labeledRecords.reduce((sum, h) => sum + (h.accuracy || 0), 0) / labeledRecords.length)
+        : 0;
+    document.getElementById('stat-avg-accuracy').textContent = avgAccuracy + '%';
+    
+    document.getElementById('stat-tagged').textContent = history.filter(h => h.tags && h.tags.length > 0).length;
+}
+
+// 渲染表格
+function renderHistoryTable() {
+    const history = getHistory();
+    const filtered = filterHistory(history);
+    
+    // 分页
+    const totalPages = Math.ceil(filtered.length / pageSize);
+    currentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageData = filtered.slice(startIndex, endIndex);
+    
+    const tbody = document.getElementById('history-table-body');
+    tbody.innerHTML = pageData.map(h => `
+        <tr class="hover:bg-gray-50">
+            <td class="py-3 px-4"><input type="checkbox" data-id="${h.id}" onchange="toggleSelection(${h.id})" class="rounded" ${selectedIds.includes(h.id) ? 'checked' : ''}></td>
+            <td class="py-3 px-4 text-gray-600">${new Date(h.timestamp).toLocaleString('zh-CN')}</td>
+            <td class="py-3 px-4">
+                <span class="text-xs px-2 py-1 rounded bg-gray-100">${h.provider || 'csdn'}</span>
+                <span class="ml-1 text-xs font-medium">${h.model}</span>
+            </td>
+            <td class="py-3 px-4 max-w-xs truncate text-gray-600" title="${h.fullRequirement || h.requirement}">${h.requirement}</td>
+            <td class="py-3 px-4">
+                ${h.accuracy ? `<span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">${h.accuracy}%</span>` : '<span class="text-xs text-gray-400">未标注</span>'}
+            </td>
+            <td class="py-3 px-4">
+                <span class="px-2 py-1 text-xs rounded ${h.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                    ${h.success ? '成功' : '失败'}
+                </span>
+            </td>
+            <td class="py-3 px-4">
+                ${h.tags && h.tags.length > 0 
+                    ? h.tags.map(t => `<span class="inline-block px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 mr-1">${t}</span>`).join('')
+                    : '<span class="text-xs text-gray-400">无标签</span>'}
+            </td>
+            <td class="py-3 px-4">
+                <button class="text-xs text-primary hover:underline mr-2" onclick="viewRecord(${h.id})">查看</button>
+                <button class="text-xs text-blue-600 hover:underline mr-2" onclick="labelAccuracy(${h.id})">标注</button>
+                <button class="text-xs text-red-600 hover:underline" onclick="deleteHistoryItem(${h.id})">删除</button>
+            </td>
+        </tr>
+    `).join('');
+    
+    // 更新分页信息
+    document.getElementById('pagination-info').textContent = `共 ${filtered.length} 条记录`;
+    document.getElementById('page-indicator').textContent = `第 ${currentPage} 页 / 共 ${totalPages || 1} 页`;
+    document.getElementById('prev-page-btn').disabled = currentPage <= 1;
+    document.getElementById('next-page-btn').disabled = currentPage >= totalPages;
+}
+
+// 筛选逻辑
+function filterHistory(history) {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const status = document.getElementById('filter-status').value;
+    const model = document.getElementById('filter-model').value;
+    const provider = document.getElementById('filter-provider').value;
+    const tagFilter = document.getElementById('filter-tag').value.toLowerCase();
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    
+    return history.filter(h => {
+        // 关键词搜索
+        const matchSearch = !search || 
+            h.requirement.toLowerCase().includes(search) ||
+            h.model.toLowerCase().includes(search) ||
+            (h.tags && h.tags.some(t => t.toLowerCase().includes(search)));
+        
+        // 状态筛选
+        const matchStatus = !status || (status === 'success' ? h.success : !h.success);
+        
+        // 模型筛选
+        const matchModel = !model || h.model === model;
+        
+        // 来源筛选
+        const matchProvider = !provider || (h.provider || 'csdn') === provider;
+        
+        // 标签筛选
+        const matchTag = !tagFilter || (h.tags && h.tags.some(t => t.toLowerCase().includes(tagFilter)));
+        
+        // 日期筛选
+        const recordDate = h.timestamp.split('T')[0];
+        const matchDateFrom = !dateFrom || recordDate >= dateFrom;
+        const matchDateTo = !dateTo || recordDate <= dateTo;
+        
+        return matchSearch && matchStatus && matchModel && matchProvider && matchTag && matchDateFrom && matchDateTo;
+    });
+}
+
+// 切换高级筛选
+function toggleAdvancedFilters() {
+    const filters = document.getElementById('advanced-filters');
+    filters.classList.toggle('hidden');
+}
+
+// 选择操作
+function toggleSelection(id) {
+    const idx = selectedIds.indexOf(id);
+    if (idx > -1) {
+        selectedIds.splice(idx, 1);
+    } else {
+        selectedIds.push(id);
+    }
+    updateBatchActions();
+}
+
+function toggleSelectAll(checkbox) {
+    const pageData = filterHistory(getHistory()).slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    if (checkbox.checked) {
+        selectedIds = [...new Set([...selectedIds, ...pageData.map(h => h.id)])];
+    } else {
+        selectedIds = selectedIds.filter(id => !pageData.some(h => h.id === id));
+    }
+    updateBatchActions();
+    renderHistoryTable();
+}
+
+function updateBatchActions() {
+    document.getElementById('selected-count').textContent = `已选择 ${selectedIds.length} 项`;
+    document.getElementById('batch-tag-btn').disabled = selectedIds.length === 0;
+    document.getElementById('compare-btn').disabled = selectedIds.length < 2;
+}
+
+// 分页操作
+function changePage(delta) {
+    currentPage += delta;
+    renderHistoryTable();
+}
+
+// 查看详情
+function viewRecord(id) {
+    const history = getHistory();
+    const record = history.find(h => h.id === id);
+    if (!record) return;
+    
+    currentViewRecord = record;
+    
+    document.getElementById('detail-timestamp').textContent = new Date(record.timestamp).toLocaleString('zh-CN');
+    document.getElementById('detail-model').textContent = `${record.provider || 'csdn'} - ${record.model}`;
+    document.getElementById('detail-status').innerHTML = `<span class="px-2 py-1 text-xs rounded ${record.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${record.success ? '成功' : '失败'}</span>`;
+    document.getElementById('detail-accuracy').textContent = record.accuracy ? `${record.accuracy}%` : '未标注';
+    document.getElementById('detail-requirement').textContent = record.fullRequirement || record.requirement;
+    document.getElementById('detail-result').innerHTML = marked.parse(record.result);
+    
+    document.getElementById('view-modal').classList.add('open');
+}
+
+function closeViewModal() {
+    document.getElementById('view-modal').classList.remove('open');
+    currentViewRecord = null;
+}
+
+function reuseCurrentRecord() {
+    if (!currentViewRecord) return;
+    // 打开主页面并填入需求
+    window.location.href = `index.html?reuse=${currentViewRecord.id}`;
+}
+
+function copyCurrentResult() {
+    if (!currentViewRecord) return;
+    navigator.clipboard.writeText(currentViewRecord.result).then(() => {
+        showToast('结果已复制', 'success');
+    });
+}
+
+// 标注准确率
+function labelAccuracy(id) {
+    const accuracy = prompt('请输入准确率 (0-100):', '85');
+    if (accuracy && !isNaN(accuracy)) {
+        updateHistoryItem(id, { accuracy: parseInt(accuracy) });
+        showToast(`准确率已标注：${accuracy}%`, 'success');
+    }
+}
+
+// 批量打标签
+function batchTagSelected() {
+    if (selectedIds.length === 0) {
+        showToast('请先选择记录', 'warning');
+        return;
+    }
+    document.getElementById('batch-tag-modal').classList.add('open');
+}
+
+function closeBatchTagModal() {
+    document.getElementById('batch-tag-modal').classList.remove('open');
+}
+
+let selectedTags = [];
+
+function toggleTag(tag) {
+    const idx = selectedTags.indexOf(tag);
+    if (idx > -1) {
+        selectedTags.splice(idx, 1);
+    } else {
+        selectedTags.push(tag);
+    }
+}
+
+function applyBatchTags() {
+    const customTags = document.getElementById('custom-tag-input').value.split(',').map(t => t.trim()).filter(Boolean);
+    const allTags = [...new Set([...selectedTags, ...customTags])];
+    
+    if (allTags.length === 0) {
+        showToast('请选择或输入标签', 'warning');
+        return;
+    }
+    
+    const history = getHistory().map(h => {
+        if (selectedIds.includes(h.id)) {
+            return { ...h, tags: [...new Set([...(h.tags || []), ...allTags])] };
+        }
+        return h;
+    });
+    
+    saveHistory(history);
+    closeBatchTagModal();
+    selectedTags = [];
+    selectedIds = [];
+    document.getElementById('custom-tag-input').value = '';
+    updateBatchActions();
+    showToast(`已为 ${history.filter(h => selectedIds.includes(h.id)).length} 条记录添加标签`, 'success');
+}
+
+// 差异对比
+function compareSelected() {
+    if (selectedIds.length < 2) {
+        showToast('请至少选择 2 条记录进行对比', 'warning');
+        return;
+    }
+    
+    const history = getHistory();
+    const records = selectedIds.slice(0, 2).map(id => history.find(h => h.id === id)).filter(Boolean);
+    
+    if (records.length < 2) return;
+    
+    document.getElementById('compare-left-title').textContent = `${records[0].model} - ${new Date(records[0].timestamp).toLocaleDateString()}`;
+    document.getElementById('compare-right-title').textContent = `${records[1].model} - ${new Date(records[1].timestamp).toLocaleDateString()}`;
+    document.getElementById('compare-left-content').innerHTML = marked.parse(records[0].result);
+    document.getElementById('compare-right-content').innerHTML = marked.parse(records[1].result);
+    
+    document.getElementById('compare-modal').classList.add('open');
+}
+
+function closeCompareModal() {
+    document.getElementById('compare-modal').classList.remove('open');
+}
+
+// 导出 CSV
+function exportHistoryCSV() {
+    const history = getHistory();
+    const csv = [
+        ['时间', '模型', '来源', '需求', '结果', '状态', '准确率', '标签'].join(','),
+        ...history.map(h => [
+            h.timestamp,
+            h.model,
+            h.provider || 'csdn',
+            `"${(h.fullRequirement || h.requirement).replace(/"/g, '""').replace(/\n/g, '\\n')}"`,
+            `"${h.result.replace(/"/g, '""').replace(/\n/g, '\\n')}"`,
+            h.success ? '成功' : '失败',
+            h.accuracy || '',
+            (h.tags || []).join(';')
+        ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai_history_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV 已导出', 'success');
+}
+
+// 导出 HuggingFace 格式
+function exportHistoryHF() {
+    const history = getHistory().filter(h => h.success && h.accuracy >= 80);
+    
+    const hfData = {
+        version: '2.0',
+        createdAt: new Date().toISOString(),
+        description: 'HuggingFace fine-tuning format for AI test case generation',
+        data: history.map(h => ({
+            instruction: 'Generate comprehensive test cases based on the requirement',
+            input: h.fullRequirement || h.requirement,
+            output: h.result,
+            metadata: {
+                model: h.model,
+                provider: h.provider || 'csdn',
+                accuracy: h.accuracy,
+                tags: h.tags || [],
+                timestamp: h.timestamp
+            }
+        }))
+    };
+    
+    const blob = new Blob([JSON.stringify(hfData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hf_dataset_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`HuggingFace 格式已导出 (${history.length} 条样本)`, 'success');
+}
+
+// Toast 通知
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <svg class="w-5 h-5 ${type === 'success' ? 'text-green-500' : type === 'error' ? 'text-red-500' : type === 'warning' ? 'text-yellow-500' : 'text-blue-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${type === 'success' ? 'M5 13l4 4L19 7' : type === 'error' ? 'M6 18L18 6M6 6l12 12' : 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
+        </svg>
+        <span>${message}</span>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    updateStats();
+    renderHistoryTable();
+    
+    // 检查 URL 参数（从主页面跳转复用）
+    const params = new URLSearchParams(window.location.search);
+    const reuseId = params.get('reuse');
+    if (reuseId) {
+        const history = getHistory();
+        const record = history.find(h => h.id === parseInt(reuseId));
+        if (record) {
+            // 存储到 sessionStorage 供主页面读取
+            sessionStorage.setItem('reuseRecord', JSON.stringify(record));
+            window.location.href = 'index.html';
+        }
+    }
+});
+    </script>
+</body>
+</html>

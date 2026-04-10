@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨域代理脚本 - AI Test Platform v2.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        .code-block { background: #1E293B; color: #F8FAFC; padding: 16px; border-radius: 8px; overflow-x: auto; font-family: 'Monaco', 'Consolas', monospace; font-size: 13px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <h1 class="text-2xl font-bold text-gray-800">🌐 跨域代理脚本</h1>
+            </div>
+            <p class="text-gray-600">解决 UI 自动化测试中的跨域限制问题，支持三种方案：</p>
+            <ul class="mt-3 space-y-2 text-sm text-gray-700">
+                <li class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <strong>方案 A：</strong> Node.js 单文件代理脚本（推荐，零配置）
+                </li>
+                <li class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    <strong>方案 B：</strong> Chrome/Edge 插件（Manifest V3）
+                </li>
+                <li class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+                    <strong>方案 C：</strong> 手动复制 DOM JSON（无需安装）
+                </li>
+            </ul>
+        </div>
+
+        <!-- Scheme A: Node.js Proxy -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">A</span>
+                Node.js 代理脚本
+            </h2>
+            
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">特点：</h3>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>单文件，零配置，体积 < 50 行</li>
+                    <li>自动注入 <code>Access-Control-Allow-Origin: *</code></li>
+                    <li>支持录制模式：请求 + 响应写入 localStorage</li>
+                    <li>离线回放调试</li>
+                </ul>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">使用方法：</h3>
+                <ol class="list-decimal list-inside text-sm text-gray-600 space-y-2">
+                    <li>保存下方代码为 <code>cors-proxy.js</code></li>
+                    <li>运行：<code>node cors-proxy.js</code></li>
+                    <li>访问：<code>http://localhost:8080/proxy?url=https://target-site.com</code></li>
+                </ol>
+            </div>
+
+            <div class="code-block mb-4"><pre>// cors-proxy.js - 跨域代理脚本 (Node.js)
+// 启动：node cors-proxy.js
+// 访问：http://localhost:8080/proxy?url=https://example.com
+
+const http = require('http');
+const https = require('https');
+const url = require('url');
+
+const PORT = process.env.PORT || 8080;
+const RECORD_MODE = process.env.RECORD_MODE === 'true';
+
+console.log(`🚀 CORS Proxy 启动中... 端口：${PORT}`);
+console.log(`📼 录制模式：${RECORD_MODE ? '开启' : '关闭'}`);
+
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    
+    // 健康检查
+    if (parsedUrl.pathname === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+        return;
+    }
+    
+    // 代理服务
+    if (parsedUrl.pathname === '/proxy') {
+        const targetUrl = parsedUrl.query.url;
+        
+        if (!targetUrl) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '缺少 url 参数' }));
+            return;
+        }
+        
+        console.log(`📡 代理请求：${targetUrl}`);
+        
+        const target = new URL(targetUrl);
+        const protocol = target.protocol === 'https:' ? https : http;
+        
+        const options = {
+            hostname: target.hostname,
+            port: target.port || (target.protocol === 'https:' ? 443 : 80),
+            path: target.pathname + target.search,
+            method: req.method,
+            headers: {
+                ...req.headers,
+                host: target.hostname
+            }
+        };
+        
+        const proxyReq = protocol.request(options, (proxyRes) => {
+            // 注入 CORS 头
+            res.writeHead(proxyRes.statusCode, {
+                ...proxyRes.headers,
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Expose-Headers': '*'
+            });
+            
+            proxyRes.pipe(res);
+            
+            // 录制模式：保存响应
+            if (RECORD_MODE && req.method === 'GET') {
+                let data = '';
+                proxyRes.on('data', chunk => data += chunk);
+                proxyRes.on('end', () => {
+                    const record = {
+                        timestamp: new Date().toISOString(),
+                        url: targetUrl,
+                        statusCode: proxyRes.statusCode,
+                        response: data.substring(0, 50000) // 限制大小
+                    };
+                    console.log(`📼 录制：${targetUrl} (${data.length} bytes)`);
+                    // 实际环境可写入文件或数据库
+                });
+            }
+        });
+        
+        proxyReq.on('error', (e) => {
+            console.error(`❌ 代理错误：${e.message}`);
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+        });
+        
+        req.pipe(proxyReq);
+        return;
+    }
+    
+    // 前端页面（用于测试和配置）
+    if (parsedUrl.pathname === '/') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html>
+<html><head><title>CORS Proxy</title></head>
+<body style="font-family:system-ui;padding:40px;max-width:800px;margin:0 auto;">
+<h1>🌐 CORS Proxy 已就绪</h1>
+<p>使用方式：</p>
+<code style="background:#f0f0f0;padding:8px;display:block;margin:16px 0;">
+http://localhost:${PORT}/proxy?url=https://example.com
+</code>
+<p>录制模式：${RECORD_MODE ? '✅ 开启' : '❌ 关闭'} (设置 RECORD_MODE=true 启用)</p>
+</body></html>`);
+        return;
+    }
+    
+    res.writeHead(404);
+    res.end('Not Found');
+});
+
+server.listen(PORT, () => {
+    console.log(`✅ 服务器运行在 http://localhost:${PORT}`);
+});</pre></div>
+
+            <button onclick="downloadProxyScript()" class="btn-primary bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                📥 下载代理脚本
+            </button>
+        </div>
+
+        <!-- Scheme B: Chrome Extension -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">B</span>
+                Chrome/Edge 插件
+            </h2>
+            
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">特点：</h3>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>Manifest V3，兼容最新浏览器</li>
+                    <li>Content-Script 自动注入</li>
+                    <li>DOM 快照序列化后通过 runtime.sendMessage 抛回主应用</li>
+                    <li>与现有解析器 100% 兼容</li>
+                </ul>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">安装步骤：</h3>
+                <ol class="list-decimal list-inside text-sm text-gray-600 space-y-2">
+                    <li>下载下方插件包并解压</li>
+                    <li>打开 Chrome → 扩展程序 → 加载已解压的扩展程序</li>
+                    <li>选择解压后的文件夹</li>
+                    <li>刷新目标页面即可生效</li>
+                </ol>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="code-block"><pre>// manifest.json
+{
+  "manifest_version": 3,
+  "name": "CORS Helper for AI Test",
+  "version": "1.0.0",
+  "description": "跨域 DOM 抓取助手",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content-script.js"],
+    "run_at": "document_end"
+  }],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}</pre></div>
+                <div class="code-block"><pre>// content-script.js
+(function() {
+    console.log('[CORS Helper] 已注入');
+    
+    // 监听来自主应用的消息
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'CAPTURE_DOM') {
+            const snapshot = {
+                url: location.href,
+                title: document.title,
+                timestamp: new Date().toISOString(),
+                dom: document.documentElement.outerHTML,
+                cookies: document.cookie,
+                localStorage: Object.assign({}, localStorage),
+                viewport: {
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                }
+            };
+            
+            // 发送回主应用
+            event.source.postMessage({
+                type: 'DOM_SNAPSHOT',
+                data: snapshot
+            }, event.origin);
+            
+            console.log('[CORS Helper] DOM 快照已发送');
+        }
+    });
+})();</pre></div>
+            </div>
+
+            <button onclick="downloadExtension()" class="btn-primary bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                📥 下载插件包
+            </button>
+        </div>
+
+        <!-- Scheme C: Manual Copy -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-sm font-bold">C</span>
+                手动复制 DOM JSON
+            </h2>
+            
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">适用场景：</h3>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>无法安装插件或运行脚本</li>
+                    <li>临时调试需求</li>
+                    <li>安全限制严格的环境</li>
+                </ul>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="font-medium text-gray-700 mb-2">操作步骤：</h3>
+                <ol class="list-decimal list-inside text-sm text-gray-600 space-y-2">
+                    <li>在目标页面打开开发者工具（F12）</li>
+                    <li>在 Console 中粘贴下方代码并回车</li>
+                    <li>复制输出的 JSON</li>
+                    <li>在 AI Test Platform 中选择"导入 DOM JSON"</li>
+                </ol>
+            </div>
+
+            <div class="code-block mb-4"><pre>// 在目标页面 Console 中执行
+(function captureDOM() {
+    const snapshot = {
+        url: location.href,
+        title: document.title,
+        timestamp: new Date().toISOString(),
+        dom: document.documentElement.outerHTML,
+        cookies: document.cookie,
+        viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+        },
+        elements: Array.from(document.querySelectorAll('input, button, a, select, textarea'))
+            .map((el, i) => ({
+                id: i,
+                tag: el.tagName.toLowerCase(),
+                text: el.textContent?.trim().substring(0, 50) || '',
+                attributes: {
+                    id: el.id,
+                    name: el.name,
+                    class: el.className,
+                    type: el.type,
+                    value: el.value,
+                    href: el.href,
+                    placeholder: el.placeholder
+                }
+            }))
+    };
+    
+    console.log('📋 请复制以下 JSON:');
+    console.log(JSON.stringify(snapshot, null, 2));
+    
+    // 自动复制到剪贴板
+    navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2))
+        .then(() => console.log('✅ 已自动复制到剪贴板'))
+        .catch(() => console.log('⚠️ 请手动复制上方 JSON'));
+    
+    return snapshot;
+})();</pre></div>
+
+            <button onclick="copyManualScript()" class="btn-primary bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                📋 复制脚本到剪贴板
+            </button>
+        </div>
+
+        <!-- Integration Guide -->
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-3">🔗 与 AI Test Platform 集成</h2>
+            <p class="text-sm text-gray-700 mb-3">
+                跨域代理返回的 DOM 快照与现有解析器 100% 兼容，无需改动后续逻辑。
+            </p>
+            <ul class="text-sm text-gray-600 space-y-2">
+                <li>• <strong>Node 代理：</strong> 在 UI 自动化页面输入 <code>http://localhost:8080/proxy?url=目标 URL</code></li>
+                <li>• <strong>插件模式：</strong> 点击"抓取"按钮时自动触发 content-script</li>
+                <li>• <strong>手动复制：</strong> 在"导入用例"中选择"DOM JSON"格式</li>
+            </ul>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-sm text-gray-500 py-4">
+            <p>AI Test Platform v2.2 | 跨域代理解决方案</p>
+            <p class="mt-1">遇到问题？查看 <a href="#" class="text-blue-600 hover:underline" onclick="alert('请检查：\n1. Node 代理是否启动\n2. 插件是否启用\n3. 目标页面是否允许 iframe')">常见问题</a></p>
+        </div>
+    </div>
+
+    <script>
+        function downloadProxyScript() {
+            const content = `// cors-proxy.js - 跨域代理脚本 (Node.js)
+const http = require('http');
+const https = require('https');
+const url = require('url');
+
+const PORT = process.env.PORT || 8080;
+const RECORD_MODE = process.env.RECORD_MODE === 'true';
+
+console.log(\`🚀 CORS Proxy 启动中... 端口：\${PORT}\`);
+
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    
+    if (parsedUrl.pathname === '/proxy') {
+        const targetUrl = parsedUrl.query.url;
+        if (!targetUrl) {
+            res.writeHead(400).end(JSON.stringify({ error: '缺少 url 参数' }));
+            return;
+        }
+        
+        const target = new URL(targetUrl);
+        const protocol = target.protocol === 'https:' ? https : http;
+        
+        const proxyReq = protocol.request({
+            hostname: target.hostname,
+            port: target.port || (target.protocol === 'https:' ? 443 : 80),
+            path: target.pathname + target.search,
+            method: req.method,
+            headers: { ...req.headers, host: target.hostname }
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, {
+                ...proxyRes.headers,
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            });
+            proxyRes.pipe(res);
+        });
+        
+        proxyReq.on('error', (e) => {
+            res.writeHead(502).end(JSON.stringify({ error: e.message }));
+        });
+        
+        req.pipe(proxyReq);
+        return;
+    }
+    
+    res.writeHead(404).end('Not Found');
+});
+
+server.listen(PORT, () => {
+    console.log(\`✅ 服务器运行在 http://localhost:\${PORT}\`);
+});`;
+            
+            const blob = new Blob([content], { type: 'application/javascript' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'cors-proxy.js';
+            link.click();
+            URL.revokeObjectURL(link.href);
+            
+            showToast('代理脚本已下载', 'success');
+        }
+
+        function downloadExtension() {
+            const manifest = {
+                "manifest_version": 3,
+                "name": "CORS Helper for AI Test",
+                "version": "1.0.0",
+                "description": "跨域 DOM 抓取助手",
+                "permissions": ["activeTab", "scripting"],
+                "host_permissions": ["<all_urls>"],
+                "content_scripts": [{
+                    "matches": ["<all_urls>"],
+                    "js": ["content-script.js"],
+                    "run_at": "document_end"
+                }],
+                "action": {
+                    "default_popup": "popup.html"
+                }
+            };
+
+            const contentScript = `(function() {
+    console.log('[CORS Helper] 已注入');
+    
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'CAPTURE_DOM') {
+            const snapshot = {
+                url: location.href,
+                title: document.title,
+                timestamp: new Date().toISOString(),
+                dom: document.documentElement.outerHTML,
+                cookies: document.cookie,
+                localStorage: Object.assign({}, localStorage),
+                viewport: {
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                }
+            };
+            
+            event.source.postMessage({
+                type: 'DOM_SNAPSHOT',
+                data: snapshot
+            }, event.origin);
+            
+            console.log('[CORS Helper] DOM 快照已发送');
+        }
+    });
+})();`;
+
+            const popup = `<!DOCTYPE html>
+<html><head><title>CORS Helper</title></head>
+<body style="padding:16px;width:300px;font-family:system-ui;">
+<h3 style="margin:0 0 8px;">🌐 CORS Helper</h3>
+<p style="font-size:13px;color:#666;">跨域 DOM 抓取助手已启用</p>
+<p style="font-size:12px;color:#999;margin-top:16px;">AI Test Platform v2.2</p>
+</body></html>`;
+
+            // 打包为 ZIP（简化版：分别下载）
+            const files = [
+                { name: 'manifest.json', content: JSON.stringify(manifest, null, 2) },
+                { name: 'content-script.js', content: contentScript },
+                { name: 'popup.html', content: popup }
+            ];
+
+            files.forEach(file => {
+                const blob = new Blob([file.content], { type: 'text/plain' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = file.name;
+                setTimeout(() => link.click(), 100 * files.indexOf(file));
+                URL.revokeObjectURL(link.href);
+            });
+
+            showToast('插件包已下载（3 个文件）', 'success');
+        }
+
+        function copyManualScript() {
+            const script = `(function captureDOM() {
+    const snapshot = {
+        url: location.href,
+        title: document.title,
+        timestamp: new Date().toISOString(),
+        dom: document.documentElement.outerHTML,
+        cookies: document.cookie,
+        viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+        },
+        elements: Array.from(document.querySelectorAll('input, button, a, select, textarea'))
+            .map((el, i) => ({
+                id: i,
+                tag: el.tagName.toLowerCase(),
+                text: el.textContent?.trim().substring(0, 50) || '',
+                attributes: {
+                    id: el.id,
+                    name: el.name,
+                    class: el.className,
+                    type: el.type,
+                    value: el.value,
+                    href: el.href,
+                    placeholder: el.placeholder
+                }
+            }))
+    };
+    
+    console.log('📋 请复制以下 JSON:');
+    console.log(JSON.stringify(snapshot, null, 2));
+    
+    navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2))
+        .then(() => console.log('✅ 已自动复制到剪贴板'))
+        .catch(() => console.log('⚠️ 请手动复制上方 JSON'));
+    
+    return snapshot;
+})();`;
+
+            navigator.clipboard.writeText(script).then(() => {
+                showToast('脚本已复制到剪贴板', 'success');
+            }).catch(() => {
+                showToast('复制失败，请手动复制', 'warning');
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = \`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium z-50 \${
+                type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+            }\`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

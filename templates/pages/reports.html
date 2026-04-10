@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}报告导出 - AI Test Hub{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow">
+    <div class="card-body">
+        <h2 class="card-title mb-4">测试报告导出</h2>
+        
+        <!-- 报告配置 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded">
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">选择项目</span>
+                </label>
+                <select id="reportProjectSelect" class="select select-bordered" onchange="loadTestRunsForReport()">
+                    <option value="">选择项目...</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">选择测试执行</span>
+                </label>
+                <select id="reportTestRunSelect" class="select select-bordered">
+                    <option value="">选择执行记录...</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">导出格式</span>
+                </label>
+                <select id="reportFormat" class="select select-bordered">
+                    <option value="html">HTML</option>
+                    <option value="pdf">PDF</option>
+                    <option value="excel">Excel</option>
+                    <option value="word">Word</option>
+                    <option value="markdown">Markdown</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text"> </span>
+                </label>
+                <button onclick="exportReport()" class="btn btn-success w-full">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    导出报告
+                </button>
+            </div>
+        </div>
+        
+        <!-- 报告内容选项 -->
+        <div class="mb-6">
+            <h3 class="font-semibold mb-2">报告内容</h3>
+            <div class="flex flex-wrap gap-4">
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="includeCases" class="checkbox checkbox-sm" checked/>
+                    <span class="label-text">测试用例</span>
+                </label>
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="includeExecutions" class="checkbox checkbox-sm" checked/>
+                    <span class="label-text">执行结果</span>
+                </label>
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="includeDefects" class="checkbox checkbox-sm" checked/>
+                    <span class="label-text">缺陷列表</span>
+                </label>
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="includeScreenshots" class="checkbox checkbox-sm" checked/>
+                    <span class="label-text">截图附件</span>
+                </label>
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="includeCharts" class="checkbox checkbox-sm" checked/>
+                    <span class="label-text">统计图表</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- 报告预览 -->
+        <div class="border rounded p-4 min-h-96 bg-gray-50">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold">报告预览</h3>
+                <div class="flex gap-2">
+                    <button onclick="refreshPreview()" class="btn btn-ghost btn-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        刷新
+                    </button>
+                    <button onclick="printReport()" class="btn btn-ghost btn-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                        </svg>
+                        打印
+                    </button>
+                </div>
+            </div>
+            
+            <div id="reportPreview" class="prose max-w-none">
+                <div class="text-center py-16 text-gray-400">
+                    <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p>选择项目和执行记录后生成预览</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 历史报告 -->
+        <div class="mt-8">
+            <h3 class="font-semibold mb-4">历史报告</h3>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>报告名称</th>
+                            <th>格式</th>
+                            <th>大小</th>
+                            <th>生成时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportHistoryTable">
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-400">暂无历史报告</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 报告生成进度模态框 -->
+<dialog id="reportProgressModal" class="modal">
+    <div class="modal-box text-center">
+        <div class="animate-pulse mb-4">
+            <svg class="w-16 h-16 mx-auto text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="font-bold text-lg mb-2">正在生成报告...</h3>
+        <p class="text-sm text-gray-500 mb-4">这可能需要几分钟时间，请耐心等待</p>
+        <progress class="progress progress-primary w-full"></progress>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

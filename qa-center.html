@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>质量保障中心 - AI Test Platform v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+                    colors: { primary: '#2563EB', secondary: '#3B82F6', accent: '#F97316', bg: '#F8FAFC', text: '#1E293B' }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        .nav-item.active { background-color: #EFF6FF; color: #2563EB; border-right: 3px solid #2563EB; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15); }
+        .btn-primary { background-color: #2563EB; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }
+        .btn-primary:hover { background-color: #1D4ED8; }
+        .btn-secondary { background-color: #F1F5F9; color: #475569; padding: 10px 20px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-secondary:hover { background-color: #E2E8F0; }
+        .btn-danger { background-color: #EF4444; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-danger:hover { background-color: #DC2626; }
+        .btn-success { background-color: #10B981; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease; }
+        .btn-success:hover { background-color: #059669; }
+        .input-field { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; width: 100%; transition: all 0.2s ease; }
+        .input-field:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        
+        /* Toast Notifications */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; }
+        .toast { background: white; border-radius: 8px; padding: 14px 20px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 380px; }
+        .toast.success { border-left: 4px solid #10B981; }
+        .toast.error { border-left: 4px solid #EF4444; }
+        .toast.warning { border-left: 4px solid #F59E0B; }
+        .toast.info { border-left: 4px solid #2563EB; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* Modal */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1500; }
+        .modal-backdrop.open { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        
+        /* Status Indicators */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-dot.green { background-color: #10B981; }
+        .status-dot.red { background-color: #EF4444; }
+        .status-dot.yellow { background-color: #F59E0B; }
+        
+        /* Mini Chart Container */
+        .mini-chart { height: 60px; width: 120px; }
+    </style>
+</head>
+<body class="bg-bg text-text h-screen flex overflow-hidden">
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Left Sidebar Navigation -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-full flex flex-col">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-primary flex items-center gap-2">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    QA Center
+                </h1>
+                <p class="text-xs text-gray-500 mt-1">质量保障中心</p>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-4">
+                <a href="index.html" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    返回主页
+                </a>
+                <a href="#" class="nav-item active flex items-center gap-3 px-6 py-3 text-sm font-medium">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    质量概览
+                </a>
+                <a href="#stability" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" onclick="scrollToSection('stability')">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    稳定性验证
+                </a>
+                <a href="#cases" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" onclick="scrollToSection('cases')">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    测试用例库
+                </a>
+                <a href="#performance" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" onclick="scrollToSection('performance')">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    性能监控
+                </a>
+                <a href="#errors" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" onclick="scrollToSection('errors')">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    错误日志
+                </a>
+                <a href="#logs" class="nav-item flex items-center gap-3 px-6 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" onclick="scrollToSection('logs')">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    操作日志
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-gray-200">
+                <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <div class="status-dot green" id="system-status-dot"></div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-700">系统状态</p>
+                        <p class="text-xs text-gray-500" id="system-status-text">正常运行</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto">
+        <div class="p-8">
+            <!-- Page Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">🛡️ 质量保障中心</h2>
+                <p class="text-gray-600">菜单切换稳定性验证 · 测试用例管理 · 性能监控 · 错误处理 · 操作日志</p>
+            </div>
+
+            <!-- Top Stats Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl p-6 shadow-sm card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="p-3 bg-green-100 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <span class="text-xs text-gray-500">稳定性</span>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800" id="stat-stability">99.9%</p>
+                    <p class="text-xs text-green-600 mt-1">↑ 连续运行 24h 无异常</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="p-3 bg-blue-100 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </div>
+                        <span class="text-xs text-gray-500">测试用例</span>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800" id="stat-cases">0</p>
+                    <p class="text-xs text-blue-600 mt-1">已保存用例数</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="p-3 bg-purple-100 rounded-lg">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="text-xs text-gray-500">平均耗时</span>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800" id="stat-perf">0ms</p>
+                    <p class="text-xs text-purple-600 mt-1">页面切换平均耗时</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="p-3 bg-red-100 rounded-lg">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <span class="text-xs text-gray-500">错误数</span>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800" id="stat-errors">0</p>
+                    <p class="text-xs text-red-600 mt-1">未处理异常数量</p>
+                </div>
+            </div>
+
+            <!-- Module 1: Stability Validator -->
+            <section id="stability" class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    菜单切换稳定性验证器
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">7×24 自动巡检，检测空白、卡顿、报错</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button class="btn-success" id="stab-start-btn" onclick="toggleStabilityRunner()">
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                    </svg>
+                                    开始巡检
+                                </button>
+                                <select id="stab-interval" class="text-sm border rounded px-2 py-1" onchange="saveStabilitySettings()">
+                                    <option value="3000">3 秒间隔</option>
+                                    <option value="5000">5 秒间隔</option>
+                                    <option value="10000">10 秒间隔</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">实时指标</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">总点击次数</p>
+                                        <p class="text-2xl font-bold text-gray-800" id="stab-total-clicks">0</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">成功率</p>
+                                        <p class="text-2xl font-bold text-green-600" id="stab-success-rate">100%</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">平均响应</p>
+                                        <p class="text-2xl font-bold text-gray-800" id="stab-avg-response">0ms</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">错误计数</p>
+                                        <p class="text-2xl font-bold text-red-600" id="stab-error-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">最近日志 (50 条)</h4>
+                                <div class="bg-gray-50 rounded-lg p-4 h-48 overflow-y-auto">
+                                    <table class="w-full text-xs">
+                                        <thead>
+                                            <tr class="text-gray-500">
+                                                <th class="text-left py-1">时间</th>
+                                                <th class="text-left py-1">菜单</th>
+                                                <th class="text-left py-1">耗时</th>
+                                                <th class="text-left py-1">状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="stab-log-table"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 2: Test Cases Library -->
+            <section id="cases" class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                    菜单操作测试用例库
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">可编辑、可回放、可断言的场景用例</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button class="btn-secondary" onclick="exportCases()">
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    导出
+                                </button>
+                                <button class="btn-secondary" onclick="document.getElementById('cases-import-input').click()">
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                    </svg>
+                                    导入
+                                </button>
+                                <input type="file" id="cases-import-input" accept=".json" class="hidden" onchange="importCases(event)">
+                                <button class="btn-primary" onclick="showAddCaseModal()">
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    新增用例
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <button class="btn-success" onclick="runAllCases()">
+                                <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                </svg>
+                                批量执行
+                            </button>
+                            <span class="text-sm text-gray-500" id="cases-count-label">共 0 个用例</span>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b bg-gray-50">
+                                        <th class="py-3 px-4 text-left">ID</th>
+                                        <th class="py-3 px-4 text-left">名称</th>
+                                        <th class="py-3 px-4 text-left">步骤数</th>
+                                        <th class="py-3 px-4 text-left">最后执行</th>
+                                        <th class="py-3 px-4 text-left">状态</th>
+                                        <th class="py-3 px-4 text-left">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cases-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 3: Performance Monitor -->
+            <section id="performance" class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    页面切换性能监控
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">采集切换耗时，定位慢路径，自动优化</p>
+                            </div>
+                            <button class="btn-secondary" onclick="clearPerfCache()">
+                                <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                清理 DOM 缓存
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-2">
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">切换耗时趋势 (最近 30 次)</h4>
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <canvas id="perf-chart" height="200"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">性能指标</h4>
+                                <div class="space-y-4">
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">平均耗时</p>
+                                        <p class="text-2xl font-bold text-gray-800" id="perf-avg">0ms</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">最大耗时</p>
+                                        <p class="text-2xl font-bold text-orange-600" id="perf-max">0ms</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">最小耗时</p>
+                                        <p class="text-2xl font-bold text-green-600" id="perf-min">0ms</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs text-gray-500">记录总数</p>
+                                        <p class="text-2xl font-bold text-gray-800" id="perf-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 4: Error Handler -->
+            <section id="errors" class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    错误处理增强 & 日志收集
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">全局捕获未处理异常、Promise 拒绝、资源加载失败</p>
+                            </div>
+                            <button class="btn-primary" onclick="downloadDiagnosticPackage()">
+                                <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                下载诊断包
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-red-50 p-4 rounded-lg">
+                                <p class="text-xs text-gray-500">脚本错误</p>
+                                <p class="text-2xl font-bold text-red-600" id="error-count-script">0</p>
+                            </div>
+                            <div class="bg-orange-50 p-4 rounded-lg">
+                                <p class="text-xs text-gray-500">网络错误</p>
+                                <p class="text-2xl font-bold text-orange-600" id="error-count-network">0</p>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="text-xs text-gray-500">资源错误</p>
+                                <p class="text-2xl font-bold text-yellow-600" id="error-count-resource">0</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                            <pre id="error-log-content" class="text-xs text-gray-700 whitespace-pre-wrap font-mono"></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 5: Operation Logs -->
+            <section id="logs" class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                    </svg>
+                                    菜单操作日志可视化
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">每一次点击都可追踪、可回放、可筛选</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="text" id="log-search" placeholder="搜索关键词..." class="input-field w-48 text-sm" oninput="filterLogs()">
+                                <button class="btn-secondary" onclick="clearLogs()">
+                                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    清空
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b bg-gray-50">
+                                        <th class="py-3 px-4 text-left">时间</th>
+                                        <th class="py-3 px-4 text-left">用户</th>
+                                        <th class="py-3 px-4 text-left">动作</th>
+                                        <th class="py-3 px-4 text-left">目标</th>
+                                        <th class="py-3 px-4 text-left">耗时</th>
+                                        <th class="py-3 px-4 text-left">截图</th>
+                                        <th class="py-3 px-4 text-left">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logs-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Add Case Modal -->
+    <div class="modal-backdrop" id="add-case-modal">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold">新增测试用例</h3>
+                <button onclick="closeAddCaseModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">用例名称</label>
+                    <input type="text" id="case-name-input" class="input-field" placeholder="例如：正常菜单切换流程">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">测试步骤</label>
+                    <textarea id="case-steps-input" class="input-field h-32 resize-none" placeholder="每行一个步骤，格式：动作 - 目标 - 断言
+例如：
+click - #menu-dashboard - .page-dashboard.active
+click - #menu-testcase - .page-testcase.active"></textarea>
+                </div>
+                
+                <button class="btn-primary w-full" onclick="saveNewCase()">保存用例</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Global State ====================
+        let stabilityRunner = null;
+        let isRunning = false;
+        let perfChart = null;
+        
+        // localStorage keys
+        const STORAGE_KEYS = {
+            QA_LOGS: 'qa_logs',
+            QA_CASES: 'qa_cases',
+            QA_PERF: 'qa_perf',
+            QA_ERRORS: 'qa_errors'
+        };
+
+        // ==================== Initialization ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initStorage();
+            initErrorHandlers();
+            loadStabilitySettings();
+            renderAllSections();
+            initPerfChart();
+            startPerfMonitoring();
+            
+            showToast('质量保障中心已就绪', 'success');
+        });
+
+        // ==================== Storage Initialization ====================
+        function initStorage() {
+            if (!localStorage.getItem(STORAGE_KEYS.QA_LOGS)) {
+                localStorage.setItem(STORAGE_KEYS.QA_LOGS, JSON.stringify([]));
+            }
+            if (!localStorage.getItem(STORAGE_KEYS.QA_CASES)) {
+                // Initialize with default test cases
+                const defaultCases = [
+                    {
+                        id: 1,
+                        name: '正常菜单切换',
+                        steps: [
+                            { action: 'click', target: '[data-page="dashboard"]', expect: '.page-dashboard.active' },
+                            { action: 'click', target: '[data-page="test-case"]', expect: '.page-testcase.active' },
+                            { action: 'click', target: '[data-page="ui-automation"]', expect: '.page-ui-automation.active' }
+                        ],
+                        lastRun: null,
+                        status: 'pending'
+                    },
+                    {
+                        id: 2,
+                        name: '快速连点测试',
+                        steps: [
+                            { action: 'click', target: '[data-page="dashboard"]', expect: '.page-dashboard.active' },
+                            { action: 'click', target: '[data-page="dashboard"]', expect: '.page-dashboard.active' },
+                            { action: 'click', target: '[data-page="dashboard"]', expect: '.page-dashboard.active' }
+                        ],
+                        lastRun: null,
+                        status: 'pending'
+                    },
+                    {
+                        id: 3,
+                        name: '全菜单遍历',
+                        steps: [
+                            { action: 'click', target: '[data-page="dashboard"]', expect: '.page-dashboard.active' },
+                            { action: 'click', target: '[data-page="test-case"]', expect: '.page-testcase.active' },
+                            { action: 'click', target: '[data-page="template"]', expect: '.page-template.active' },
+                            { action: 'click', target: '[data-page="training"]', expect: '.page-training.active' },
+                            { action: 'click', target: '[data-page="validation"]', expect: '.page-validation.active' },
+                            { action: 'click', target: '[data-page="ui-automation"]', expect: '.page-ui-automation.active' }
+                        ],
+                        lastRun: null,
+                        status: 'pending'
+                    }
+                ];
+                localStorage.setItem(STORAGE_KEYS.QA_CASES, JSON.stringify(defaultCases));
+            }
+            if (!localStorage.getItem(STORAGE_KEYS.QA_PERF)) {
+                localStorage.setItem(STORAGE_KEYS.QA_PERF, JSON.stringify([]));
+            }
+            if (!localStorage.getItem(STORAGE_KEYS.QA_ERRORS)) {
+                localStorage.setItem(STORAGE_KEYS.QA_ERRORS, JSON.stringify([]));
+            }
+        }
+
+        // ==================== Error Handlers ====================
+        function initErrorHandlers() {
+            // Global error handler
+            window.addEventListener('error', (event) => {
+                logError({
+                    time: new Date().toISOString(),
+                    type: 'script',
+                    msg: event.message,
+                    source: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    stack: event.error?.stack || '',
+                    userAgent: navigator.userAgent
+                });
+            });
+
+            // Unhandled promise rejection
+            window.addEventListener('unhandledrejection', (event) => {
+                logError({
+                    time: new Date().toISOString(),
+                    type: 'promise',
+                    msg: event.reason?.message || String(event.reason),
+                    source: 'Promise Rejection',
+                    lineno: 0,
+                    colno: 0,
+                    stack: event.reason?.stack || '',
+                    userAgent: navigator.userAgent
+                });
+                event.preventDefault();
+            });
+
+            // Image load errors
+            document.addEventListener('error', (event) => {
+                if (event.target.tagName === 'IMG') {
+                    logError({
+                        time: new Date().toISOString(),
+                        type: 'resource',
+                        msg: `Image load failed: ${event.target.src}`,
+                        source: event.target.src,
+                        lineno: 0,
+                        colno: 0,
+                        stack: '',
+                        userAgent: navigator.userAgent
+                    });
+                }
+            }, true);
+        }
+
+        function logError(errorData) {
+            const errors = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_ERRORS) || '[]');
+            errors.unshift(errorData);
+            
+            // Keep only last 500 errors
+            if (errors.length > 500) {
+                errors.splice(500);
+            }
+            
+            localStorage.setItem(STORAGE_KEYS.QA_ERRORS, JSON.stringify(errors));
+            renderErrorSection();
+            
+            // Show toast for critical errors
+            if (errorData.type === 'script') {
+                showToast(`脚本错误：${errorData.msg}`, 'error');
+                updateSystemStatus('error');
+            }
+        }
+
+        // ==================== Stability Validator ====================
+        function toggleStabilityRunner() {
+            if (isRunning) {
+                stopStabilityRunner();
+            } else {
+                startStabilityRunner();
+            }
+        }
+
+        function startStabilityRunner() {
+            isRunning = true;
+            document.getElementById('stab-start-btn').innerHTML = `
+                <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 100 2 1 1 0 000-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10a1 1 0 100 2 1 1 0 000-2z"/>
+                </svg>
+                停止巡检
+            `;
+            document.getElementById('stab-start-btn').classList.replace('btn-success', 'btn-danger');
+            
+            const interval = parseInt(document.getElementById('stab-interval').value);
+            
+            stabilityRunner = setInterval(async () => {
+                await runStabilityCheck();
+            }, interval);
+            
+            showToast('稳定性巡检已启动', 'info');
+        }
+
+        function stopStabilityRunner() {
+            isRunning = false;
+            if (stabilityRunner) {
+                clearInterval(stabilityRunner);
+                stabilityRunner = null;
+            }
+            
+            document.getElementById('stab-start-btn').innerHTML = `
+                <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                </svg>
+                开始巡检
+            `;
+            document.getElementById('stab-start-btn').classList.replace('btn-danger', 'btn-success');
+            
+            showToast('稳定性巡检已停止', 'info');
+        }
+
+        async function runStabilityCheck() {
+            const menuItems = document.querySelectorAll('.nav-item[data-page]');
+            const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]');
+            
+            for (const item of menuItems) {
+                const startTime = performance.now();
+                const menuItem = item.dataset.page;
+                
+                try {
+                    // Simulate click
+                    item.click();
+                    
+                    // Wait for page title change
+                    await waitForTitleChange(1000);
+                    
+                    const endTime = performance.now();
+                    const duration = Math.round(endTime - startTime);
+                    
+                    const logEntry = {
+                        time: new Date().toISOString(),
+                        type: 'stab',
+                        menuItem: menuItem,
+                        cost: duration,
+                        status: duration > 1000 ? 'FAIL' : 'PASS'
+                    };
+                    
+                    logs.unshift(logEntry);
+                    
+                    // Update stats
+                    updateStabilityStats(logs);
+                    
+                } catch (error) {
+                    const logEntry = {
+                        time: new Date().toISOString(),
+                        type: 'stab',
+                        menuItem: menuItem,
+                        cost: 0,
+                        status: 'ERROR',
+                        error: error.message
+                    };
+                    logs.unshift(logEntry);
+                    
+                    logError({
+                        time: new Date().toISOString(),
+                        type: 'stability',
+                        msg: `Stability check failed: ${menuItem}`,
+                        source: 'stability-runner',
+                        lineno: 0,
+                        colno: 0,
+                        stack: error.stack || '',
+                        userAgent: navigator.userAgent
+                    });
+                }
+            }
+            
+            // Keep only last 1000 logs
+            if (logs.length > 1000) {
+                logs.splice(1000);
+            }
+            
+            localStorage.setItem(STORAGE_KEYS.QA_LOGS, JSON.stringify(logs));
+            renderStabilityLog(logs.slice(0, 50));
+        }
+
+        function waitForTitleChange(timeout = 1000) {
+            return new Promise((resolve, reject) => {
+                const startTime = Date.now();
+                const checkInterval = setInterval(() => {
+                    if (Date.now() - startTime > timeout) {
+                        clearInterval(checkInterval);
+                        reject(new Error('Title change timeout'));
+                    } else {
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+
+        function updateStabilityStats(logs) {
+            const totalClicks = logs.length;
+            const successCount = logs.filter(l => l.status === 'PASS').length;
+            const errorCount = logs.filter(l => l.status === 'ERROR' || l.status === 'FAIL').length;
+            const avgResponse = logs.length > 0 
+                ? Math.round(logs.reduce((sum, l) => sum + (l.cost || 0), 0) / logs.length)
+                : 0;
+            
+            document.getElementById('stab-total-clicks').textContent = totalClicks;
+            document.getElementById('stab-success-rate').textContent = totalClicks > 0 
+                ? `${Math.round((successCount / totalClicks) * 100)}%` 
+                : '100%';
+            document.getElementById('stab-avg-response').textContent = `${avgResponse}ms`;
+            document.getElementById('stab-error-count').textContent = errorCount;
+            
+            // Update overview stat
+            const stability = totalClicks > 0 ? ((successCount / totalClicks) * 100).toFixed(1) : 100;
+            document.getElementById('stat-stability').textContent = `${stability}%`;
+        }
+
+        function renderStabilityLog(logs) {
+            const tbody = document.getElementById('stab-log-table');
+            tbody.innerHTML = logs.map(log => `
+                <tr class="border-b">
+                    <td class="py-2 text-gray-500">${new Date(log.time).toLocaleTimeString()}</td>
+                    <td class="py-2">${log.menuItem}</td>
+                    <td class="py-2">${log.cost}ms</td>
+                    <td class="py-2">
+                        <span class="status-dot ${log.status === 'PASS' ? 'green' : log.status === 'ERROR' ? 'red' : 'yellow'}"></span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function saveStabilitySettings() {
+            localStorage.setItem('qa_stability_interval', document.getElementById('stab-interval').value);
+        }
+
+        function loadStabilitySettings() {
+            const saved = localStorage.getItem('qa_stability_interval');
+            if (saved) {
+                document.getElementById('stab-interval').value = saved;
+            }
+        }
+
+        // ==================== Test Cases Library ====================
+        function renderCasesSection() {
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            const tbody = document.getElementById('cases-table-body');
+            
+            document.getElementById('cases-count-label').textContent = `共 ${cases.length} 个用例`;
+            document.getElementById('stat-cases').textContent = cases.length;
+            
+            if (cases.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">暂无测试用例</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = cases.map(c => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4">#${c.id}</td>
+                    <td class="py-3 px-4 font-medium">${escapeHtml(c.name)}</td>
+                    <td class="py-3 px-4">${c.steps.length}</td>
+                    <td class="py-3 px-4">${c.lastRun ? new Date(c.lastRun).toLocaleString() : '-'}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 text-xs rounded ${
+                            c.status === 'pass' ? 'bg-green-100 text-green-700' :
+                            c.status === 'fail' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                        }">
+                            ${c.status === 'pass' ? '通过' : c.status === 'fail' ? '失败' : '待执行'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <button class="text-blue-600 hover:underline mr-2" onclick="runSingleCase(${c.id})">执行</button>
+                        <button class="text-red-600 hover:underline" onclick="deleteCase(${c.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function showAddCaseModal() {
+            document.getElementById('add-case-modal').classList.add('open');
+        }
+
+        function closeAddCaseModal() {
+            document.getElementById('add-case-modal').classList.remove('open');
+            document.getElementById('case-name-input').value = '';
+            document.getElementById('case-steps-input').value = '';
+        }
+
+        function saveNewCase() {
+            const name = document.getElementById('case-name-input').value.trim();
+            const stepsText = document.getElementById('case-steps-input').value.trim();
+            
+            if (!name) {
+                showToast('请输入用例名称', 'warning');
+                return;
+            }
+            
+            const steps = stepsText.split('\n').filter(l => l.trim()).map(line => {
+                const parts = line.split('-').map(p => p.trim());
+                return {
+                    action: parts[0] || 'click',
+                    target: parts[1] || '',
+                    expect: parts[2] || ''
+                };
+            });
+            
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            const newCase = {
+                id: Date.now(),
+                name: name,
+                steps: steps,
+                lastRun: null,
+                status: 'pending'
+            };
+            
+            cases.push(newCase);
+            localStorage.setItem(STORAGE_KEYS.QA_CASES, JSON.stringify(cases));
+            
+            closeAddCaseModal();
+            renderCasesSection();
+            showToast('用例已保存', 'success');
+        }
+
+        async function runSingleCase(caseId) {
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            const testCase = cases.find(c => c.id === caseId);
+            
+            if (!testCase) {
+                showToast('用例不存在', 'error');
+                return;
+            }
+            
+            showToast(`开始执行：${testCase.name}`, 'info');
+            
+            let allPassed = true;
+            
+            for (const step of testCase.steps) {
+                try {
+                    const element = document.querySelector(step.target);
+                    if (element) {
+                        element.click();
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
+                        if (step.expect) {
+                            const expectedElement = document.querySelector(step.expect);
+                            if (!expectedElement) {
+                                allPassed = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        allPassed = false;
+                        break;
+                    }
+                } catch (error) {
+                    allPassed = false;
+                    break;
+                }
+            }
+            
+            // Update case status
+            testCase.lastRun = new Date().toISOString();
+            testCase.status = allPassed ? 'pass' : 'fail';
+            
+            localStorage.setItem(STORAGE_KEYS.QA_CASES, JSON.stringify(cases));
+            renderCasesSection();
+            
+            showToast(allPassed ? '用例执行通过' : '用例执行失败', allPassed ? 'success' : 'error');
+            
+            // Log the execution
+            logAction('system', 'case_execution', testCase.name, { passed: allPassed });
+        }
+
+        async function runAllCases() {
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            
+            if (cases.length === 0) {
+                showToast('没有可执行的用例', 'warning');
+                return;
+            }
+            
+            showToast(`开始批量执行 ${cases.length} 个用例`, 'info');
+            
+            for (const testCase of cases) {
+                await runSingleCase(testCase.id);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            showToast('批量执行完成', 'success');
+        }
+
+        function deleteCase(caseId) {
+            if (!confirm('确定要删除这个用例吗？')) return;
+            
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            const filtered = cases.filter(c => c.id !== caseId);
+            localStorage.setItem(STORAGE_KEYS.QA_CASES, JSON.stringify(filtered));
+            renderCasesSection();
+            showToast('用例已删除', 'success');
+        }
+
+        function exportCases() {
+            const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+            const blob = new Blob([JSON.stringify(cases, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `test_cases_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('用例已导出', 'success');
+        }
+
+        function importCases(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    const cases = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]');
+                    
+                    // Merge cases
+                    imported.forEach(c => {
+                        c.id = Date.now() + Math.random();
+                        cases.push(c);
+                    });
+                    
+                    localStorage.setItem(STORAGE_KEYS.QA_CASES, JSON.stringify(cases));
+                    renderCasesSection();
+                    showToast(`已导入 ${imported.length} 个用例`, 'success');
+                } catch (error) {
+                    showToast('导入失败：文件格式错误', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // ==================== Performance Monitor ====================
+        function initPerfChart() {
+            const ctx = document.getElementById('perf-chart').getContext('2d');
+            perfChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '切换耗时 (ms)',
+                        data: [],
+                        borderColor: '#2563EB',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function startPerfMonitoring() {
+            // Override navigateTo if exists in parent
+            const originalNavigateTo = window.navigateTo;
+            if (originalNavigateTo) {
+                window.navigateTo = function(page) {
+                    const startMark = performance.mark('nav-start');
+                    const result = originalNavigateTo.call(this, page);
+                    
+                    performance.mark('nav-end');
+                    performance.measure('navigation', 'nav-start', 'nav-end');
+                    
+                    const measures = performance.getEntriesByName('navigation');
+                    const duration = measures.length > 0 ? Math.round(measures[measures.length - 1].duration) : 0;
+                    
+                    recordPerfData({
+                        from: 'current',
+                        to: page,
+                        cost: duration,
+                        memory: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
+                        time: new Date().toISOString()
+                    });
+                    
+                    performance.clearMarks();
+                    performance.clearMeasures();
+                    
+                    return result;
+                };
+            }
+        }
+
+        function recordPerfData(data) {
+            const perfs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_PERF) || '[]');
+            perfs.unshift(data);
+            
+            // Keep only last 1000 records
+            if (perfs.length > 1000) {
+                perfs.splice(1000);
+            }
+            
+            localStorage.setItem(STORAGE_KEYS.QA_PERF, JSON.stringify(perfs));
+            updatePerfSection(perfs);
+        }
+
+        function updatePerfSection(perfs) {
+            if (perfs.length === 0) return;
+            
+            const recent = perfs.slice(0, 30).reverse();
+            const costs = perfs.map(p => p.cost);
+            
+            const avg = Math.round(costs.reduce((a, b) => a + b, 0) / costs.length);
+            const max = Math.max(...costs);
+            const min = Math.min(...costs);
+            
+            document.getElementById('perf-avg').textContent = `${avg}ms`;
+            document.getElementById('perf-max').textContent = `${max}ms`;
+            document.getElementById('perf-min').textContent = `${min}ms`;
+            document.getElementById('perf-count').textContent = perfs.length;
+            
+            // Update overview stat
+            document.getElementById('stat-perf').textContent = `${avg}ms`;
+            
+            // Update chart
+            if (perfChart) {
+                perfChart.data.labels = recent.map((_, i) => i + 1);
+                perfChart.data.datasets[0].data = recent.map(p => p.cost);
+                perfChart.update();
+            }
+        }
+
+        function clearPerfCache() {
+            localStorage.setItem(STORAGE_KEYS.QA_PERF, JSON.stringify([]));
+            showToast('性能缓存已清理', 'success');
+            renderPerfSection();
+        }
+
+        // ==================== Error Section ====================
+        function renderErrorSection() {
+            const errors = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_ERRORS) || '[]');
+            
+            const scriptErrors = errors.filter(e => e.type === 'script' || e.type === 'promise').length;
+            const networkErrors = errors.filter(e => e.type === 'network').length;
+            const resourceErrors = errors.filter(e => e.type === 'resource').length;
+            
+            document.getElementById('error-count-script').textContent = scriptErrors;
+            document.getElementById('error-count-network').textContent = networkErrors;
+            document.getElementById('error-count-resource').textContent = resourceErrors;
+            document.getElementById('stat-errors').textContent = errors.length;
+            
+            const logContent = errors.slice(0, 100).map(e => 
+                `[${new Date(e.time).toLocaleString()}] ${e.type.toUpperCase()}: ${e.msg}\n  Source: ${e.source}:${e.lineno}\n`
+            ).join('\n');
+            
+            document.getElementById('error-log-content').textContent = logContent || '暂无错误日志';
+        }
+
+        function downloadDiagnosticPackage() {
+            const diagnostic = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                logs: JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]'),
+                errors: JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_ERRORS) || '[]'),
+                perf: JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_PERF) || '[]'),
+                cases: JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_CASES) || '[]')
+            };
+            
+            const blob = new Blob([JSON.stringify(diagnostic, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `diagnostic_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('诊断包已下载', 'success');
+        }
+
+        // ==================== Operation Logs ====================
+        function logAction(user, action, target, extra = {}) {
+            const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]');
+            
+            // Capture screenshot if html2canvas available
+            let screenshot = null;
+            if (window.html2canvas) {
+                html2canvas(document.body).then(canvas => {
+                    screenshot = canvas.toDataURL('image/jpeg', 0.7);
+                }).catch(() => {});
+            }
+            
+            const logEntry = {
+                time: new Date().toISOString(),
+                user: user,
+                action: action,
+                target: target,
+                cost: extra.cost || 0,
+                screenshot: screenshot,
+                ...extra
+            };
+            
+            logs.unshift(logEntry);
+            
+            // Keep only last 1000 logs
+            if (logs.length > 1000) {
+                logs.splice(1000);
+            }
+            
+            localStorage.setItem(STORAGE_KEYS.QA_LOGS, JSON.stringify(logs));
+            renderLogsSection();
+        }
+
+        function renderLogsSection() {
+            const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]');
+            const tbody = document.getElementById('logs-table-body');
+            
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-400">暂无操作日志</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = logs.slice(0, 100).map(log => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 text-xs">${new Date(log.time).toLocaleString()}</td>
+                    <td class="py-3 px-4">${escapeHtml(log.user || 'system')}</td>
+                    <td class="py-3 px-4">${escapeHtml(log.action)}</td>
+                    <td class="py-3 px-4 text-xs font-mono">${escapeHtml(log.target || '-')}</td>
+                    <td class="py-3 px-4">${log.cost || 0}ms</td>
+                    <td class="py-3 px-4">
+                        ${log.screenshot ? '<span class="text-green-600">✓</span>' : '-'}
+                    </td>
+                    <td class="py-3 px-4">
+                        <button class="text-blue-600 hover:underline" onclick="replayLog('${log.time}')">回放</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterLogs() {
+            const keyword = document.getElementById('log-search').value.toLowerCase();
+            const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]');
+            const filtered = logs.filter(l => 
+                l.action.toLowerCase().includes(keyword) ||
+                l.target.toLowerCase().includes(keyword) ||
+                l.user.toLowerCase().includes(keyword)
+            );
+            
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = filtered.slice(0, 100).map(log => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 text-xs">${new Date(log.time).toLocaleString()}</td>
+                    <td class="py-3 px-4">${escapeHtml(log.user || 'system')}</td>
+                    <td class="py-3 px-4">${escapeHtml(log.action)}</td>
+                    <td class="py-3 px-4 text-xs font-mono">${escapeHtml(log.target || '-')}</td>
+                    <td class="py-3 px-4">${log.cost || 0}ms</td>
+                    <td class="py-3 px-4">
+                        ${log.screenshot ? '<span class="text-green-600">✓</span>' : '-'}
+                    </td>
+                    <td class="py-3 px-4">
+                        <button class="text-blue-600 hover:underline" onclick="replayLog('${log.time}')">回放</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function clearLogs() {
+            if (!confirm('确定要清空所有操作日志吗？')) return;
+            localStorage.setItem(STORAGE_KEYS.QA_LOGS, JSON.stringify([]));
+            showToast('日志已清空', 'success');
+            renderLogsSection();
+        }
+
+        function replayLog(timestamp) {
+            const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]');
+            const log = logs.find(l => l.time === timestamp);
+            
+            if (!log) {
+                showToast('日志记录不存在', 'error');
+                return;
+            }
+            
+            showToast(`回放：${log.action} → ${log.target}`, 'info');
+            
+            // Highlight the target element
+            if (log.target) {
+                const element = document.querySelector(log.target);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.transition = 'all 0.3s ease';
+                    element.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.5)';
+                    setTimeout(() => {
+                        element.style.boxShadow = '';
+                    }, 2000);
+                }
+            }
+        }
+
+        // ==================== Utility Functions ====================
+        function scrollToSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+                error: '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+                warning: '<svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
+                info: '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+            };
+            
+            toast.innerHTML = `${icons[type]}<span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function updateSystemStatus(status) {
+            const dot = document.getElementById('system-status-dot');
+            const text = document.getElementById('system-status-text');
+            
+            if (status === 'error') {
+                dot.className = 'status-dot red';
+                text.textContent = '存在异常';
+            } else {
+                dot.className = 'status-dot green';
+                text.textContent = '正常运行';
+            }
+        }
+
+        function renderAllSections() {
+            renderStabilityLog(JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_LOGS) || '[]').slice(0, 50));
+            renderCasesSection();
+            renderPerfSection();
+            renderErrorSection();
+            renderLogsSection();
+        }
+
+        function renderPerfSection() {
+            const perfs = JSON.parse(localStorage.getItem(STORAGE_KEYS.QA_PERF) || '[]');
+            updatePerfSection(perfs);
+        }
+
+        // ==================== Global Event Listeners ====================
+        // Track all navigation clicks
+        document.addEventListener('click', (e) => {
+            const navItem = e.target.closest('.nav-item[data-page]');
+            if (navItem) {
+                const startTime = performance.now();
+                
+                setTimeout(() => {
+                    const endTime = performance.now();
+                    const duration = Math.round(endTime - startTime);
+                    
+                    logAction('user', 'nav_click', navItem.dataset.page, { cost: duration });
+                    recordPerfData({
+                        from: 'current',
+                        to: navItem.dataset.page,
+                        cost: duration,
+                        memory: 0,
+                        time: new Date().toISOString()
+                    });
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>
